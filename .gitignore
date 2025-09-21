@@ -1,0 +1,9 @@
+# Ignore the il2cpp decompilation since it's static.
+FFVI
+
+# FFVI_Mod build artifacts and binaries
+FFVI_Mod/bin/
+FFVI_Mod/obj/
+FFVI_Mod/*.dll
+FFVI_Mod/*.pdb
+FFVI_Mod/*.exe

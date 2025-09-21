@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>FFVI_ScreenReader</AssemblyName>
+    <Description>Screen Reader Accessibility Mod for Final Fantasy VI</Description>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="MelonLoader">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/net6/MelonLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppInterop.Runtime">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/net6/Il2CppInterop.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppInterop.Common">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/net6/Il2CppInterop.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/net6/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2Cppmscorlib">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/Il2Cppmscorlib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppSystem">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/Il2CppSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
