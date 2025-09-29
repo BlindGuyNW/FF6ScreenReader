@@ -17,9 +17,15 @@ namespace FFVI_ScreenReader
     {
         private static Tolk.Tolk tolk = new Tolk.Tolk();
 
+        // Coroutine cleanup system
+        private static readonly List<System.Collections.IEnumerator> activeCoroutines = new List<System.Collections.IEnumerator>();
+        private static readonly object coroutineLock = new object();
+        private static int maxConcurrentCoroutines = 3;
+
         public override void OnInitializeMelon()
         {
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
+            LoggerInstance.Msg("*** COROUTINE CLEANUP SYSTEM ENABLED - TESTING MANAGED COROUTINES ***");
 
             // Initialize Tolk for screen reader support
             try
@@ -44,6 +50,7 @@ namespace FFVI_ScreenReader
         {
             try
             {
+                CleanupAllCoroutines();
                 tolk.Unload();
                 LoggerInstance.Msg("Screen reader support unloaded");
             }
@@ -51,6 +58,75 @@ namespace FFVI_ScreenReader
             {
                 LoggerInstance.Error($"Error unloading screen reader: {ex.Message}");
             }
+        }
+
+        // Cleanup all active coroutines
+        public static void CleanupAllCoroutines()
+        {
+            lock (coroutineLock)
+            {
+                if (activeCoroutines.Count > 0)
+                {
+                    MelonLogger.Msg($"Cleaning up {activeCoroutines.Count} active coroutines");
+                    foreach (var coroutine in activeCoroutines)
+                    {
+                        try
+                        {
+                            MelonCoroutines.Stop(coroutine);
+                        }
+                        catch (Exception ex)
+                        {
+                            MelonLogger.Error($"Error stopping coroutine: {ex.Message}");
+                        }
+                    }
+                    activeCoroutines.Clear();
+                }
+            }
+        }
+
+        // Start a coroutine with cleanup management
+        public static void StartManagedCoroutine(System.Collections.IEnumerator coroutine)
+        {
+            lock (coroutineLock)
+            {
+                // Clean up completed coroutines first
+                CleanupCompletedCoroutines();
+
+                // If we're at the limit, stop the oldest one
+                if (activeCoroutines.Count >= maxConcurrentCoroutines)
+                {
+                    MelonLogger.Msg("Too many active coroutines, stopping oldest");
+                    var oldest = activeCoroutines[0];
+                    try
+                    {
+                        MelonCoroutines.Stop(oldest);
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error stopping oldest coroutine: {ex.Message}");
+                    }
+                    activeCoroutines.RemoveAt(0);
+                }
+
+                // Start the new coroutine
+                try
+                {
+                    MelonCoroutines.Start(coroutine);
+                    activeCoroutines.Add(coroutine);
+                    MelonLogger.Msg($"Started coroutine. Active count: {activeCoroutines.Count}");
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Error($"Error starting managed coroutine: {ex.Message}");
+                }
+            }
+        }
+
+        // Remove completed coroutines from tracking
+        private static void CleanupCompletedCoroutines()
+        {
+            // Note: This is a simplified approach - in practice we'd need better completed detection
+            // For now we rely on the max limit to prevent accumulation
         }
 
         public static void SpeakText(string text)
@@ -140,7 +216,31 @@ namespace FFVI_ScreenReader
 
             try
             {
+                // Safety checks to prevent crashes
+                if (cursor == null)
+                {
+                    MelonLogger.Msg("Cursor is null, skipping");
+                    yield break;
+                }
+
+                if (cursor.gameObject == null)
+                {
+                    MelonLogger.Msg("Cursor GameObject is null, skipping");
+                    yield break;
+                }
+
+                // Check if the cursor transform is still valid
+                if (cursor.transform == null)
+                {
+                    MelonLogger.Msg("Cursor transform is null, skipping");
+                    yield break;
+                }
+
+                // Get scene info for debugging
+                var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
                 MelonLogger.Msg($"=== {direction} called (delayed) ===");
+                MelonLogger.Msg($"Scene: {sceneName}");
                 MelonLogger.Msg($"Cursor Index: {cursor.Index}");
                 MelonLogger.Msg($"Cursor GameObject: {cursor.gameObject?.name ?? "null"}");
                 MelonLogger.Msg($"Count: {count}, IsLoop: {isLoop}");
@@ -150,63 +250,115 @@ namespace FFVI_ScreenReader
 
                 // First, try the title-style approach (cursor moves in hierarchy)
                 Transform current = cursor.transform;
-                while (current != null && menuText == null)
+                int hierarchyDepth = 0;
+                while (current != null && menuText == null && hierarchyDepth < 10) // Prevent infinite loops
                 {
-                    // Look for text directly on this object (not children)
-                    var text = current.GetComponent<UnityEngine.UI.Text>();
-                    if (text?.text != null && !string.IsNullOrEmpty(text.text.Trim()))
+                    try
                     {
-                        menuText = text.text;
-                        MelonLogger.Msg($"Found menu text: '{menuText}' from {current.name} (direct)");
+                        // Additional safety check - ensure object still exists
+                        if (current.gameObject == null)
+                        {
+                            MelonLogger.Msg("Current gameObject is null, breaking hierarchy walk");
+                            break;
+                        }
+
+                        // Look for text directly on this object (not children)
+                        var text = current.GetComponent<UnityEngine.UI.Text>();
+                        if (text?.text != null && !string.IsNullOrEmpty(text.text.Trim()))
+                        {
+                            menuText = text.text;
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from {current.name} (direct)");
+                            break;
+                        }
+
+                        current = current.parent;
+                        hierarchyDepth++;
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error walking hierarchy at depth {hierarchyDepth}: {ex.Message}");
                         break;
                     }
-
-                    current = current.parent;
                 }
 
                 // If that didn't work, check if we're in a config-style menu
                 if (menuText == null)
                 {
-                    current = cursor.transform;
-                    while (current != null)
+                    try
                     {
-                        // Look for config_root which indicates config-style menu
-                        if (current.name == "config_root")
+                        current = cursor.transform;
+                        hierarchyDepth = 0;
+                        while (current != null && hierarchyDepth < 10)
                         {
-                            // Find the Content object that contains all config_tool_command items
-                            var content = current.GetComponentInChildren<Transform>().Find("MaskObject/Scroll View/Viewport/Content");
-                            if (content != null && cursor.Index < content.childCount)
+                            // Additional safety check
+                            if (current.gameObject == null)
                             {
-                                // Get the specific config_tool_command at the cursor index
-                                var configItem = content.GetChild(cursor.Index);
-                                var configText = configItem.GetComponentInChildren<UnityEngine.UI.Text>();
-                                if (configText?.text != null && !string.IsNullOrEmpty(configText.text.Trim()))
-                                {
-                                    menuText = configText.text;
-                                    MelonLogger.Msg($"Found menu text: '{menuText}' from config item {cursor.Index}");
-                                    break;
-                                }
+                                MelonLogger.Msg("Current gameObject is null in config check");
+                                break;
                             }
-                            break;
+
+                            // Look for config_root which indicates config-style menu
+                            if (current.name == "config_root")
+                            {
+                                // Find the Content object that contains all config_tool_command items
+                                var content = current.GetComponentInChildren<Transform>()?.Find("MaskObject/Scroll View/Viewport/Content");
+                                if (content != null && cursor.Index >= 0 && cursor.Index < content.childCount)
+                                {
+                                    // Get the specific config_tool_command at the cursor index
+                                    var configItem = content.GetChild(cursor.Index);
+                                    if (configItem != null && configItem.gameObject != null)
+                                    {
+                                        var configText = configItem.GetComponentInChildren<UnityEngine.UI.Text>();
+                                        if (configText?.text != null && !string.IsNullOrEmpty(configText.text.Trim()))
+                                        {
+                                            menuText = configText.text;
+                                            MelonLogger.Msg($"Found menu text: '{menuText}' from config item {cursor.Index}");
+                                            break;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            current = current.parent;
+                            hierarchyDepth++;
                         }
-                        current = current.parent;
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error in config menu check: {ex.Message}");
                     }
                 }
 
                 // Final fallback: use the old approach with GetComponentInChildren
                 if (menuText == null)
                 {
-                    current = cursor.transform;
-                    while (current != null && menuText == null)
+                    try
                     {
-                        var text = current.GetComponentInChildren<UnityEngine.UI.Text>();
-                        if (text?.text != null && !string.IsNullOrEmpty(text.text.Trim()))
+                        current = cursor.transform;
+                        hierarchyDepth = 0;
+                        while (current != null && menuText == null && hierarchyDepth < 10)
                         {
-                            menuText = text.text;
-                            MelonLogger.Msg($"Found menu text: '{menuText}' from {current.name} (fallback)");
-                            break;
+                            // Safety check for destroyed objects
+                            if (current.gameObject == null)
+                            {
+                                MelonLogger.Msg("Current gameObject is null in fallback check");
+                                break;
+                            }
+
+                            var text = current.GetComponentInChildren<UnityEngine.UI.Text>();
+                            if (text?.text != null && !string.IsNullOrEmpty(text.text.Trim()))
+                            {
+                                menuText = text.text;
+                                MelonLogger.Msg($"Found menu text: '{menuText}' from {current.name} (fallback)");
+                                break;
+                            }
+                            current = current.parent;
+                            hierarchyDepth++;
                         }
-                        current = current.parent;
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error in fallback text search: {ex.Message}");
                     }
                 }
 
@@ -236,8 +388,27 @@ namespace FFVI_ScreenReader
         {
             try
             {
-                // Start a coroutine to wait one frame, then read the cursor position
-                MelonCoroutines.Start(FFVI_ScreenReaderMod.WaitAndReadCursor(__instance, "NextIndex", count, isLoop));
+                // Safety checks before starting coroutine
+                if (__instance == null)
+                {
+                    MelonLogger.Msg("GameCursor instance is null in NextIndex patch");
+                    return;
+                }
+
+                if (__instance.gameObject == null)
+                {
+                    MelonLogger.Msg("GameCursor GameObject is null in NextIndex patch");
+                    return;
+                }
+
+                if (__instance.transform == null)
+                {
+                    MelonLogger.Msg("GameCursor transform is null in NextIndex patch");
+                    return;
+                }
+
+                // Use managed coroutine system
+                FFVI_ScreenReaderMod.StartManagedCoroutine(FFVI_ScreenReaderMod.WaitAndReadCursor(__instance, "NextIndex", count, isLoop));
             }
             catch (Exception ex)
             {
@@ -255,8 +426,27 @@ namespace FFVI_ScreenReader
         {
             try
             {
-                // Start a coroutine to wait one frame, then read the cursor position
-                MelonCoroutines.Start(FFVI_ScreenReaderMod.WaitAndReadCursor(__instance, "PrevIndex", count, isLoop));
+                // Safety checks before starting coroutine
+                if (__instance == null)
+                {
+                    MelonLogger.Msg("GameCursor instance is null in PrevIndex patch");
+                    return;
+                }
+
+                if (__instance.gameObject == null)
+                {
+                    MelonLogger.Msg("GameCursor GameObject is null in PrevIndex patch");
+                    return;
+                }
+
+                if (__instance.transform == null)
+                {
+                    MelonLogger.Msg("GameCursor transform is null in PrevIndex patch");
+                    return;
+                }
+
+                // Use managed coroutine system
+                FFVI_ScreenReaderMod.StartManagedCoroutine(FFVI_ScreenReaderMod.WaitAndReadCursor(__instance, "PrevIndex", count, isLoop));
             }
             catch (Exception ex)
             {
@@ -265,7 +455,8 @@ namespace FFVI_ScreenReader
         }
     }
 
-    // Hook the SetActiveFocusImage method - this is called when an item gets focused!
+    // TEMPORARILY DISABLED FOR TESTING
+    /*// Hook the SetActiveFocusImage method - this is called when an item gets focused!
     [HarmonyPatch(typeof(TitleCommandContentView), nameof(TitleCommandContentView.SetActiveFocusImage))]
     public static class TitleCommandContentView_SetActiveFocusImage_Patch
     {
@@ -287,5 +478,5 @@ namespace FFVI_ScreenReader
                 MelonLogger.Error($"Error in SetActiveFocusImage patch: {ex.Message}");
             }
         }
-    }
+    }*/
 }
