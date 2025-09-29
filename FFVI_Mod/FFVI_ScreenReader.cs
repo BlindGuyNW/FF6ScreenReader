@@ -4,6 +4,7 @@ using HarmonyLib;
 using Il2CppLast.Management;
 using Il2CppLast.Defaine;
 using Il2CppLast.UI;
+using Il2CppLast.UI.Touch;
 using GameCursor = Il2CppLast.UI.Cursor;
 using MelonLoader;
 using UnityEngine;
@@ -92,19 +93,11 @@ namespace FFVI_ScreenReader
                 // Clean up completed coroutines first
                 CleanupCompletedCoroutines();
 
-                // If we're at the limit, stop the oldest one
+                // If we're at the limit, just remove the oldest one from tracking
+                // (We can't reliably stop coroutines in MelonLoader)
                 if (activeCoroutines.Count >= maxConcurrentCoroutines)
                 {
-                    MelonLogger.Msg("Too many active coroutines, stopping oldest");
-                    var oldest = activeCoroutines[0];
-                    try
-                    {
-                        MelonCoroutines.Stop(oldest);
-                    }
-                    catch (Exception ex)
-                    {
-                        MelonLogger.Error($"Error stopping oldest coroutine: {ex.Message}");
-                    }
+                    MelonLogger.Msg("Too many active coroutines, removing oldest from tracking");
                     activeCoroutines.RemoveAt(0);
                 }
 
@@ -174,6 +167,195 @@ namespace FFVI_ScreenReader
                 TitleCommandId.SoundSettings => "Sound Settings",
                 _ => commandId.ToString() // Fallback to enum name
             };
+        }
+
+        // Find config menu value text (for sliders, dropdowns, etc.)
+        public static string FindConfigValueText(Transform cursorTransform, int cursorIndex)
+        {
+            try
+            {
+                MelonLogger.Msg($"=== Looking for config values (cursor index: {cursorIndex}) ===");
+
+                // First, try to find the config content area and get the specific item at cursor index
+                Transform current = cursorTransform;
+                int depth = 0;
+                while (current != null && depth < 10)
+                {
+                    // Look for config_root which contains the list
+                    if (current.name == "config_root")
+                    {
+                        MelonLogger.Msg($"Found config_root, looking for content at index {cursorIndex}");
+
+                        // Find the Content object that contains all config items
+                        var content = current.GetComponentInChildren<Transform>()?.Find("MaskObject/Scroll View/Viewport/Content");
+                        if (content != null && cursorIndex >= 0 && cursorIndex < content.childCount)
+                        {
+                            var configItem = content.GetChild(cursorIndex);
+                            MelonLogger.Msg($"Found config item at index {cursorIndex}: {configItem.name}");
+
+                            // NOW WE KNOW: The values are in the type-specific roots!
+                            // Look for the root child which contains the UI
+                            Transform rootChild = configItem.Find("root");
+                            if (rootChild != null)
+                            {
+                                // Check slider_type_root for slider values
+                                var sliderRoot = rootChild.Find("slider_type_root");
+                                if (sliderRoot != null && sliderRoot.gameObject.activeInHierarchy)
+                                {
+                                    var sliderTexts = sliderRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                    foreach (var text in sliderTexts)
+                                    {
+                                        if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                                        {
+                                            MelonLogger.Msg($"Found slider value: '{text.text}'");
+                                            return text.text.Trim();
+                                        }
+                                    }
+                                }
+
+                                // Check arrowbutton_type_root for arrow button values
+                                var arrowRoot = rootChild.Find("arrowbutton_type_root");
+                                if (arrowRoot != null && arrowRoot.gameObject.activeInHierarchy)
+                                {
+                                    var arrowTexts = arrowRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                    foreach (var text in arrowTexts)
+                                    {
+                                        if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                                        {
+                                            MelonLogger.Msg($"Found arrow value: '{text.text}'");
+                                            return text.text.Trim();
+                                        }
+                                    }
+                                }
+
+                                // Check dropdown_type_root for dropdown values
+                                var dropdownRoot = rootChild.Find("dropdown_type_root");
+                                if (dropdownRoot != null && dropdownRoot.gameObject.activeInHierarchy)
+                                {
+                                    var dropdownTexts = dropdownRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                    foreach (var text in dropdownTexts)
+                                    {
+                                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
+                                        {
+                                            MelonLogger.Msg($"Found dropdown value: '{text.text}'");
+                                            return text.text.Trim();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    // Check for in-game config menu structure (command_list_root)
+                    if (current.name.Contains("command_list") || current.name.Contains("menu_list"))
+                    {
+                        MelonLogger.Msg($"Found in-game config structure: {current.name}, looking for config values");
+
+                        // Find Content under Scroll View
+                        Transform contentList = null;
+                        var allTransforms = current.GetComponentsInChildren<Transform>();
+                        foreach (var t in allTransforms)
+                        {
+                            if (t.name == "Content" && t.parent != null &&
+                                (t.parent.name == "Viewport" || t.parent.parent?.name == "Scroll View"))
+                            {
+                                contentList = t;
+                                break;
+                            }
+                        }
+
+                        if (contentList != null && cursorIndex >= 0 && cursorIndex < contentList.childCount)
+                        {
+                            MelonLogger.Msg($"In-game config: Found content list with {contentList.childCount} items, cursor at {cursorIndex}");
+
+                            var menuItem = contentList.GetChild(cursorIndex);
+                            if (menuItem != null)
+                            {
+                                MelonLogger.Msg($"In-game config item: {menuItem.name}");
+
+                                // Use the SAME logic as title config - look for root/slider_type_root and root/arrowbutton_type_root
+                                Transform rootChild = menuItem.Find("root");
+                                if (rootChild != null)
+                                {
+                                    MelonLogger.Msg("Found root child in in-game config, checking for type-specific roots");
+
+                                    // Check slider_type_root for slider values (same as title config)
+                                    var sliderRoot = rootChild.Find("slider_type_root");
+                                    if (sliderRoot != null && sliderRoot.gameObject.activeInHierarchy)
+                                    {
+                                        MelonLogger.Msg("Found slider_type_root in in-game config");
+                                        var sliderTexts = sliderRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                        foreach (var text in sliderTexts)
+                                        {
+                                            if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                                            {
+                                                var value = text.text.Trim();
+                                                if (value != "new text") // Skip placeholder text
+                                                {
+                                                    MelonLogger.Msg($"Found in-game slider value: '{value}'");
+                                                    return value;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Check arrowbutton_type_root for arrow button values (same as title config)
+                                    var arrowRoot = rootChild.Find("arrowbutton_type_root");
+                                    if (arrowRoot != null && arrowRoot.gameObject.activeInHierarchy)
+                                    {
+                                        MelonLogger.Msg("Found arrowbutton_type_root in in-game config");
+                                        var arrowTexts = arrowRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                        foreach (var text in arrowTexts)
+                                        {
+                                            if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                                            {
+                                                var value = text.text.Trim();
+                                                if (value != "new text") // Skip placeholder text
+                                                {
+                                                    MelonLogger.Msg($"Found in-game arrow value: '{value}'");
+                                                    return value;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Check dropdown_type_root for dropdown values (same as title config)
+                                    var dropdownRoot = rootChild.Find("dropdown_type_root");
+                                    if (dropdownRoot != null && dropdownRoot.gameObject.activeInHierarchy)
+                                    {
+                                        MelonLogger.Msg("Found dropdown_type_root in in-game config");
+                                        var dropdownTexts = dropdownRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                        foreach (var text in dropdownTexts)
+                                        {
+                                            if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
+                                            {
+                                                var value = text.text.Trim();
+                                                if (value != "new text") // Skip placeholder text
+                                                {
+                                                    MelonLogger.Msg($"Found in-game dropdown value: '{value}'");
+                                                    return value;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    current = current.parent;
+                    depth++;
+                }
+
+                MelonLogger.Msg("No config values found");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error finding config value: {ex.Message}");
+            }
+            return null;
         }
 
         // Dump the entire hierarchy starting from a given transform
@@ -281,7 +463,147 @@ namespace FFVI_ScreenReader
                     }
                 }
 
-                // If that didn't work, check if we're in a config-style menu
+                // If that didn't work, check if we're in a config-style menu (title or in-game)
+                if (menuText == null)
+                {
+                    try
+                    {
+                        // First try to find ConfigCommandView directly
+                        current = cursor.transform;
+                        hierarchyDepth = 0;
+                        while (current != null && hierarchyDepth < 10)
+                        {
+                            var configView = current.GetComponent<ConfigCommandView>();
+                            if (configView != null && configView.nameText?.text != null)
+                            {
+                                menuText = configView.nameText.text.Trim();
+                                MelonLogger.Msg($"Found menu text: '{menuText}' from ConfigCommandView.nameText");
+                                break;
+                            }
+
+                            // Check parent too
+                            if (current.parent != null)
+                            {
+                                configView = current.parent.GetComponent<ConfigCommandView>();
+                                if (configView != null && configView.nameText?.text != null)
+                                {
+                                    menuText = configView.nameText.text.Trim();
+                                    MelonLogger.Msg($"Found menu text: '{menuText}' from parent ConfigCommandView.nameText");
+                                    break;
+                                }
+                            }
+
+                            current = current.parent;
+                            hierarchyDepth++;
+                        }
+
+                        // If still no luck, try the old config_root approach
+                        if (menuText == null)
+                        {
+                            current = cursor.transform;
+                            hierarchyDepth = 0;
+                            while (current != null && hierarchyDepth < 10)
+                            {
+                                // Additional safety check
+                                if (current.gameObject == null)
+                                {
+                                    MelonLogger.Msg("Current gameObject is null in config check");
+                                    break;
+                                }
+
+                                // Look for config_root which indicates config-style menu
+                                if (current.name == "config_root")
+                                {
+                                    // Find the Content object that contains all config_tool_command items
+                                    var content = current.GetComponentInChildren<Transform>()?.Find("MaskObject/Scroll View/Viewport/Content");
+                                    if (content != null && cursor.Index >= 0 && cursor.Index < content.childCount)
+                                    {
+                                        MelonLogger.Msg($"In-game config: Found content with {content.childCount} items, cursor at {cursor.Index}");
+
+                                        // Get the specific config_tool_command at the cursor index
+                                        var configItem = content.GetChild(cursor.Index);
+                                        if (configItem != null && configItem.gameObject != null)
+                                        {
+                                            MelonLogger.Msg($"Config item name: {configItem.name}");
+
+                                            // Check if this has the same structure as title config
+                                            var rootChild = configItem.Find("root");
+                                            if (rootChild != null)
+                                            {
+                                                var rootConfigView = rootChild.GetComponent<ConfigCommandView>();
+                                                if (rootConfigView != null && rootConfigView.nameText?.text != null)
+                                                {
+                                                    menuText = rootConfigView.nameText.text.Trim();
+                                                    MelonLogger.Msg($"Found menu text from root ConfigCommandView: '{menuText}'");
+                                                    break;
+                                                }
+                                            }
+
+                                            // Look for ConfigCommandView anywhere in the item
+                                            var itemConfigView = configItem.GetComponentInChildren<ConfigCommandView>();
+                                            if (itemConfigView != null && itemConfigView.nameText?.text != null)
+                                            {
+                                                menuText = itemConfigView.nameText.text.Trim();
+                                                MelonLogger.Msg($"Found menu text: '{menuText}' from config item ConfigCommandView");
+                                                break;
+                                            }
+
+                                            // Debug: List all text components to see what's available
+                                            var allTexts = configItem.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                            MelonLogger.Msg($"Found {allTexts.Length} text components in config item:");
+                                            foreach (var text in allTexts)
+                                            {
+                                                if (!string.IsNullOrEmpty(text.text?.Trim()))
+                                                {
+                                                    MelonLogger.Msg($"  - {text.name}: '{text.text}'");
+                                                }
+                                            }
+
+                                            // Try to find the correct text (not "Battle Type")
+                                            foreach (var text in allTexts)
+                                            {
+                                                // Skip if it's "Battle Type" and we're not on the first item
+                                                if (text.text == "Battle Type" && cursor.Index > 0)
+                                                    continue;
+
+                                                // Look for text that seems like a menu option name
+                                                if (text.name.Contains("command_name") || text.name.Contains("nameText") || text.name == "last_text")
+                                                {
+                                                    if (!string.IsNullOrEmpty(text.text?.Trim()))
+                                                    {
+                                                        menuText = text.text.Trim();
+                                                        MelonLogger.Msg($"Found menu text from {text.name}: '{menuText}'");
+                                                        break;
+                                                    }
+                                                }
+                                            }
+
+                                            // Final fallback
+                                            if (menuText == null)
+                                            {
+                                                var configText = configItem.GetComponentInChildren<UnityEngine.UI.Text>();
+                                                if (configText?.text != null && !string.IsNullOrEmpty(configText.text.Trim()))
+                                                {
+                                                    menuText = configText.text;
+                                                    MelonLogger.Msg($"Found menu text (fallback): '{menuText}'");
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                                current = current.parent;
+                                hierarchyDepth++;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Error in config menu check: {ex.Message}");
+                    }
+                }
+
+                // Check for in-game config menu structure
                 if (menuText == null)
                 {
                     try
@@ -290,30 +612,77 @@ namespace FFVI_ScreenReader
                         hierarchyDepth = 0;
                         while (current != null && hierarchyDepth < 10)
                         {
-                            // Additional safety check
-                            if (current.gameObject == null)
+                            // In-game config uses command_list_root or similar structure
+                            if (current.name.Contains("command_list") || current.name.Contains("menu_list"))
                             {
-                                MelonLogger.Msg("Current gameObject is null in config check");
-                                break;
-                            }
+                                MelonLogger.Msg($"Found in-game list structure: {current.name}");
 
-                            // Look for config_root which indicates config-style menu
-                            if (current.name == "config_root")
-                            {
-                                // Find the Content object that contains all config_tool_command items
-                                var content = current.GetComponentInChildren<Transform>()?.Find("MaskObject/Scroll View/Viewport/Content");
-                                if (content != null && cursor.Index >= 0 && cursor.Index < content.childCount)
+                                // Try to find the content list with menu items
+                                Transform contentList = null;
+
+                                // Look for Content under Scroll View
+                                var allTransforms = current.GetComponentsInChildren<Transform>();
+                                foreach (var t in allTransforms)
                                 {
-                                    // Get the specific config_tool_command at the cursor index
-                                    var configItem = content.GetChild(cursor.Index);
-                                    if (configItem != null && configItem.gameObject != null)
+                                    if (t.name == "Content" && t.parent != null &&
+                                        (t.parent.name == "Viewport" || t.parent.parent?.name == "Scroll View"))
                                     {
-                                        var configText = configItem.GetComponentInChildren<UnityEngine.UI.Text>();
-                                        if (configText?.text != null && !string.IsNullOrEmpty(configText.text.Trim()))
+                                        contentList = t;
+                                        break;
+                                    }
+                                }
+
+                                if (contentList != null && cursor.Index >= 0 && cursor.Index < contentList.childCount)
+                                {
+                                    MelonLogger.Msg($"Found content list with {contentList.childCount} items, cursor at {cursor.Index}");
+
+                                    var menuItem = contentList.GetChild(cursor.Index);
+                                    MelonLogger.Msg($"Menu item at index {cursor.Index}: {menuItem.name}");
+
+                                    // Look for ConfigCommandController on this item
+                                    var commandController = menuItem.GetComponent<ConfigCommandController>();
+                                    if (commandController == null)
+                                    {
+                                        commandController = menuItem.GetComponentInChildren<ConfigCommandController>();
+                                    }
+
+                                    if (commandController != null)
+                                    {
+                                        MelonLogger.Msg("Found ConfigCommandController");
+
+                                        // Get the view which has the text
+                                        if (commandController.view != null && commandController.view.nameText != null)
                                         {
-                                            menuText = configText.text;
-                                            MelonLogger.Msg($"Found menu text: '{menuText}' from config item {cursor.Index}");
+                                            menuText = commandController.view.nameText.text.Trim();
+                                            MelonLogger.Msg($"Got text from ConfigCommandController.view.nameText: '{menuText}'");
                                             break;
+                                        }
+                                    }
+
+                                    // Alternative: Look for ConfigCommandView directly
+                                    var commandView = menuItem.GetComponentInChildren<ConfigCommandView>();
+                                    if (commandView != null && commandView.nameText != null)
+                                    {
+                                        menuText = commandView.nameText.text.Trim();
+                                        MelonLogger.Msg($"Got text from ConfigCommandView.nameText: '{menuText}'");
+                                        break;
+                                    }
+
+                                    // Last resort: Get text components but avoid values
+                                    var texts = menuItem.GetComponentsInChildren<UnityEngine.UI.Text>();
+                                    foreach (var text in texts)
+                                    {
+                                        if (!string.IsNullOrEmpty(text.text?.Trim()))
+                                        {
+                                            var textValue = text.text.Trim();
+                                            // Skip if it looks like a value (number, percentage, On/Off)
+                                            if (!System.Text.RegularExpressions.Regex.IsMatch(textValue, @"^\d+%?$|^On$|^Off$|^Active$|^Wait$"))
+                                            {
+                                                // This is likely the menu option name
+                                                menuText = textValue;
+                                                MelonLogger.Msg($"Got text from Text component: '{menuText}'");
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -325,7 +694,7 @@ namespace FFVI_ScreenReader
                     }
                     catch (Exception ex)
                     {
-                        MelonLogger.Error($"Error in config menu check: {ex.Message}");
+                        MelonLogger.Error($"Error in in-game config menu check: {ex.Message}");
                     }
                 }
 
@@ -362,9 +731,22 @@ namespace FFVI_ScreenReader
                     }
                 }
 
+                // Check for config menu values
+                string configValue = null;
                 if (menuText != null)
                 {
-                    SpeakText(menuText);
+                    configValue = FindConfigValueText(cursor.transform, cursor.Index);
+                    if (configValue != null)
+                    {
+                        MelonLogger.Msg($"Found config value: '{configValue}'");
+                        // Combine option name and value
+                        string fullText = $"{menuText}: {configValue}";
+                        SpeakText(fullText);
+                    }
+                    else
+                    {
+                        SpeakText(menuText);
+                    }
                 }
                 else
                 {
