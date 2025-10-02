@@ -99,15 +99,19 @@ namespace FFVI_ScreenReader.Menus
             menuText = TryConfigCommandView(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 3: Keyboard/Gamepad settings
+            // Strategy 3: Battle menus with IconTextView (ability/item lists)
+            menuText = TryIconTextView(cursor);
+            if (menuText != null) return menuText;
+
+            // Strategy 4: Keyboard/Gamepad settings
             menuText = KeyboardGamepadReader.TryReadSettings(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
 
-            // Strategy 4: In-game config menu structure
+            // Strategy 5: In-game config menu structure
             menuText = TryInGameConfigMenu(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 5: Fallback with GetComponentInChildren
+            // Strategy 6: Fallback with GetComponentInChildren
             menuText = TryFallbackTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
@@ -294,7 +298,131 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 4: In-game config menu structure.
+        /// Strategy 3: Battle menus with IconTextView (ability/item lists).
+        /// Battle menus use IconTextView components which wrap the actual Text component.
+        /// </summary>
+        private static string TryIconTextView(GameCursor cursor)
+        {
+            try
+            {
+                Transform current = cursor.transform;
+                int hierarchyDepth = 0;
+
+                while (current != null && hierarchyDepth < 10)
+                {
+                    if (current.gameObject == null)
+                    {
+                        MelonLogger.Msg("Current gameObject is null in IconTextView check");
+                        break;
+                    }
+
+                    // Look for IconTextView components directly on cursor
+                    var iconTextView = current.GetComponent<IconTextView>();
+                    if (iconTextView != null && iconTextView.nameText != null && iconTextView.nameText.text != null)
+                    {
+                        string menuText = iconTextView.nameText.text.Trim();
+                        if (!string.IsNullOrEmpty(menuText))
+                        {
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from IconTextView.nameText");
+                            return menuText;
+                        }
+                    }
+
+                    // Try to find a Content list with indexed children (common in scrollable lists)
+                    Transform contentList = FindContentList(current);
+                    if (contentList != null && cursor.Index >= 0 && cursor.Index < contentList.childCount)
+                    {
+                        MelonLogger.Msg($"Found Content list with {contentList.childCount} children, cursor at index {cursor.Index}");
+                        Transform selectedChild = contentList.GetChild(cursor.Index);
+
+                        if (selectedChild != null)
+                        {
+                            // Look for IconTextView in this specific child
+                            iconTextView = selectedChild.GetComponentInChildren<IconTextView>();
+                            if (iconTextView != null && iconTextView.nameText != null && iconTextView.nameText.text != null)
+                            {
+                                string menuText = iconTextView.nameText.text.Trim();
+                                if (!string.IsNullOrEmpty(menuText))
+                                {
+                                    MelonLogger.Msg($"Found menu text: '{menuText}' from Content[{cursor.Index}] IconTextView.nameText");
+                                    return menuText;
+                                }
+                            }
+
+                            // Look for BattleAbilityInfomationContentView in this child
+                            var battleAbilityView = selectedChild.GetComponentInChildren<BattleAbilityInfomationContentView>();
+                            if (battleAbilityView != null)
+                            {
+                                if (battleAbilityView.iconTextView != null &&
+                                    battleAbilityView.iconTextView.nameText != null &&
+                                    battleAbilityView.iconTextView.nameText.text != null)
+                                {
+                                    string menuText = battleAbilityView.iconTextView.nameText.text.Trim();
+                                    if (!string.IsNullOrEmpty(menuText))
+                                    {
+                                        MelonLogger.Msg($"Found menu text: '{menuText}' from Content[{cursor.Index}] BattleAbilityView.iconTextView");
+                                        return menuText;
+                                    }
+                                }
+
+                                if (battleAbilityView.abilityIconText != null &&
+                                    battleAbilityView.abilityIconText.nameText != null &&
+                                    battleAbilityView.abilityIconText.nameText.text != null)
+                                {
+                                    string menuText = battleAbilityView.abilityIconText.nameText.text.Trim();
+                                    if (!string.IsNullOrEmpty(menuText))
+                                    {
+                                        MelonLogger.Msg($"Found menu text: '{menuText}' from Content[{cursor.Index}] BattleAbilityView.abilityIconText");
+                                        return menuText;
+                                    }
+                                }
+                            }
+
+                            // Look for BattleAbilityInfomationContentController in this child
+                            var battleAbilityController = selectedChild.GetComponentInChildren<BattleAbilityInfomationContentController>();
+                            if (battleAbilityController != null && battleAbilityController.view != null)
+                            {
+                                if (battleAbilityController.view.iconTextView != null &&
+                                    battleAbilityController.view.iconTextView.nameText != null &&
+                                    battleAbilityController.view.iconTextView.nameText.text != null)
+                                {
+                                    string menuText = battleAbilityController.view.iconTextView.nameText.text.Trim();
+                                    if (!string.IsNullOrEmpty(menuText))
+                                    {
+                                        MelonLogger.Msg($"Found menu text: '{menuText}' from Content[{cursor.Index}] BattleAbilityController.view.iconTextView");
+                                        return menuText;
+                                    }
+                                }
+
+                                if (battleAbilityController.view.abilityIconText != null &&
+                                    battleAbilityController.view.abilityIconText.nameText != null &&
+                                    battleAbilityController.view.abilityIconText.nameText.text != null)
+                                {
+                                    string menuText = battleAbilityController.view.abilityIconText.nameText.text.Trim();
+                                    if (!string.IsNullOrEmpty(menuText))
+                                    {
+                                        MelonLogger.Msg($"Found menu text: '{menuText}' from Content[{cursor.Index}] BattleAbilityController.view.abilityIconText");
+                                        return menuText;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    current = current.parent;
+                    hierarchyDepth++;
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error in IconTextView check: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Strategy 5: In-game config menu structure.
         /// </summary>
         private static string TryInGameConfigMenu(GameCursor cursor)
         {
@@ -382,7 +510,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 5: Final fallback with GetComponentInChildren.
+        /// Strategy 6: Final fallback with GetComponentInChildren.
         /// </summary>
         private static string TryFallbackTextSearch(Transform cursorTransform)
         {

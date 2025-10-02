@@ -97,4 +97,93 @@ namespace FFVI_ScreenReader.Patches
             }
         }
     }
+
+    [HarmonyPatch(typeof(GameCursor), nameof(GameCursor.SkipNextIndex))]
+    public static class Cursor_SkipNextIndex_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(GameCursor __instance, Il2CppSystem.Action<int> action, int count, int skipCount, bool isEndPoint = false, bool isLoop = false)
+        {
+            try
+            {
+                // Safety checks before starting coroutine
+                if (__instance == null)
+                {
+                    MelonLogger.Msg("GameCursor instance is null in SkipNextIndex patch");
+                    return;
+                }
+
+                if (__instance.gameObject == null)
+                {
+                    MelonLogger.Msg("GameCursor GameObject is null in SkipNextIndex patch");
+                    return;
+                }
+
+                if (__instance.transform == null)
+                {
+                    MelonLogger.Msg("GameCursor transform is null in SkipNextIndex patch");
+                    return;
+                }
+
+                // Use managed coroutine system
+                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                    __instance,
+                    "SkipNextIndex",
+                    count,
+                    isLoop
+                );
+                CoroutineManager.StartManaged(coroutine);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error in SkipNextIndex patch: {ex.Message}");
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(GameCursor), nameof(GameCursor.SkipPrevIndex))]
+    public static class Cursor_SkipPrevIndex_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(GameCursor __instance, Il2CppSystem.Action<int> action, int count, int skipCount, bool isEndPoint = false, bool isLoop = false)
+        {
+            try
+            {
+                // Safety checks before starting coroutine
+                if (__instance == null)
+                {
+                    MelonLogger.Msg("GameCursor instance is null in SkipPrevIndex patch");
+                    return;
+                }
+
+                if (__instance.gameObject == null)
+                {
+                    MelonLogger.Msg("GameCursor GameObject is null in SkipPrevIndex patch");
+                    return;
+                }
+
+                if (__instance.transform == null)
+                {
+                    MelonLogger.Msg("GameCursor transform is null in SkipPrevIndex patch");
+                    return;
+                }
+
+                // Use managed coroutine system
+                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                    __instance,
+                    "SkipPrevIndex",
+                    count,
+                    isLoop
+                );
+                CoroutineManager.StartManaged(coroutine);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error in SkipPrevIndex patch: {ex.Message}");
+            }
+        }
+    }
+
+    // NOTE: Index setter patch removed - causes crashes during scene loading
+    // Battle navigation likely uses SkipNextIndex/SkipPrevIndex instead
 }
