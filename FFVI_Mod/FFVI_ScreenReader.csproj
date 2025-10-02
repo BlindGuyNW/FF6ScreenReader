@@ -49,6 +49,10 @@
       <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/Il2CppSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
