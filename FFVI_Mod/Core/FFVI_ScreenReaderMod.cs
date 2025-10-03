@@ -66,6 +66,29 @@ namespace FFVI_ScreenReader.Core
             {
                 CyclePrevious();
             }
+
+            // Hotkey: Ctrl+M to dump all monster data
+            if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) && UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.M))
+            {
+                LoggerInstance.Msg("Dumping all monster data...");
+                MonsterDataDumper.DumpAllMonsters();
+            }
+
+            // Hotkey: Ctrl+Shift+Y to search for Ymir
+            if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) &&
+                UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) &&
+                UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Y))
+            {
+                LoggerInstance.Msg("Searching for Ymir...");
+                MonsterDataDumper.FindMonsterByName("ymir");
+            }
+
+            // Hotkey: Ctrl+Enter to auto-navigate to currently selected entity
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) &&
+                (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl)))
+            {
+                AutoNavigateToCurrentEntity();
+            }
         }
 
         private void RescanEntities()
@@ -79,10 +102,31 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
+            // Remember the currently selected entity by its position
+            EntityInfo previousEntity = null;
+            if (currentEntityIndex >= 0 && currentEntityIndex < cachedEntities.Count)
+            {
+                previousEntity = cachedEntities[currentEntityIndex];
+            }
+
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
             cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 500f);
 
-            // Reset index if it's out of bounds
+            // Try to find the same entity in the new list (by position)
+            if (previousEntity != null)
+            {
+                for (int i = 0; i < cachedEntities.Count; i++)
+                {
+                    // Match by position (within small tolerance)
+                    if (Vector3.Distance(cachedEntities[i].Position, previousEntity.Position) < 1f)
+                    {
+                        currentEntityIndex = i;
+                        return;
+                    }
+                }
+            }
+
+            // If not found or no previous entity, reset to 0
             if (currentEntityIndex >= cachedEntities.Count)
                 currentEntityIndex = 0;
         }
@@ -105,7 +149,8 @@ namespace FFVI_ScreenReader.Core
             var entityInfo = cachedEntities[currentEntityIndex];
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
 
-            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo);
+            // Pass current player position to get fresh direction/distance
+            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerPos);
             var pathInfo = Field.FieldNavigationHelper.FindPathTo(
                 playerPos,
                 entityInfo.Position,
@@ -150,6 +195,40 @@ namespace FFVI_ScreenReader.Core
                 currentEntityIndex = cachedEntities.Count - 1;
 
             AnnounceCurrentEntity();
+        }
+
+        private void AutoNavigateToCurrentEntity()
+        {
+            if (cachedEntities.Count == 0 || currentEntityIndex < 0 || currentEntityIndex >= cachedEntities.Count)
+            {
+                SpeakText("No entity selected");
+                return;
+            }
+
+            var entityInfo = cachedEntities[currentEntityIndex];
+
+            var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
+            if (playerController?.fieldPlayer == null)
+            {
+                SpeakText("Player not available");
+                return;
+            }
+
+            // Simply walk to the cached entity position
+            var player = playerController.fieldPlayer;
+
+            // Call MoveTo with explicit null values for Il2Cpp nullable parameters
+            player.MoveTo(
+                entityInfo.Position,
+                speedId: new Il2CppSystem.Nullable<Il2Cpp.FieldEntityConstants.FieldSpriteSpeedID>(),
+                animName: null,
+                keepMovingIfStop: false,
+                inputAxis: new Il2CppSystem.Nullable<UnityEngine.Vector2>(),
+                duration: 0f
+            );
+
+            SpeakText($"Walking to {entityInfo.Name}");
+            LoggerInstance.Msg($"Auto-navigating to {entityInfo.Name} at {entityInfo.Position}");
         }
 
         /// <summary>
