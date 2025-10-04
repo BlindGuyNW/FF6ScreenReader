@@ -26,7 +26,7 @@ if [ ! -f "bin/Release/net6.0/FFVI_ScreenReader.dll" ]; then
 fi
 
 # Deploy to game directory
-GAME_MODS_DIR="/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/Mods"
+GAME_MODS_DIR="/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods"
 echo "Deploying to: $GAME_MODS_DIR"
 
 # Create Mods directory if it doesn't exist

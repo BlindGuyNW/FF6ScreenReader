@@ -67,22 +67,6 @@ namespace FFVI_ScreenReader.Core
                 CyclePrevious();
             }
 
-            // Hotkey: Ctrl+M to dump all monster data
-            if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) && UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.M))
-            {
-                LoggerInstance.Msg("Dumping all monster data...");
-                MonsterDataDumper.DumpAllMonsters();
-            }
-
-            // Hotkey: Ctrl+Shift+Y to search for Ymir
-            if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) &&
-                UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) &&
-                UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Y))
-            {
-                LoggerInstance.Msg("Searching for Ymir...");
-                MonsterDataDumper.FindMonsterByName("ymir");
-            }
-
             // Hotkey: Ctrl+Enter to auto-navigate to currently selected entity
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) &&
                 (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl)))

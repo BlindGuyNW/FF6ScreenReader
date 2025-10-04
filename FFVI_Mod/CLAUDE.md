@@ -60,7 +60,7 @@ The mod implements a managed coroutine system to prevent memory leaks:
 ### Game Integration
 
 The mod references decompiled il2cpp assemblies from the game located at:
-`/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Il2CppAssemblies/`
+`/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/MelonLoader/Il2CppAssemblies/`
 
 Key game classes used:
 - `Il2CppLast.UI.Cursor` (aliased as `GameCursor`) - cursor navigation
@@ -69,7 +69,7 @@ Key game classes used:
 - `Il2CppLast.UI.ConfigCommandsData` - config menu data and types
 - `Il2CppLast.UI.Touch.ConfigCommandController` - touch-based config controls
 
-Decompiled source is available in `/home/zkline/ffpr/FFVI/` for reference when debugging menu structures.
+Decompiled source is available in `/home/zkline/ffpr/ff6/` for reference when debugging menu structures.
 
 ## Build and Deployment
 
@@ -83,7 +83,7 @@ cd FFVI_Mod
 dotnet build FFVI_ScreenReader.csproj --configuration Release
 
 # Manual deployment after build
-cp bin/Release/net6.0/FFVI_ScreenReader.dll "/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/ff6/Mods/"
+cp bin/Release/net6.0/FFVI_ScreenReader.dll "/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/"
 ```
 
 ### Dependencies Required
@@ -93,15 +93,13 @@ cp bin/Release/net6.0/FFVI_ScreenReader.dll "/mnt/c/games/Final Fantasy I-VI Bun
 
 ### Deployment Path
 The build script automatically copies the compiled DLL to:
-`/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/Mods/`
-
-Note: Path is case-sensitive on Linux/WSL. The actual game path uses lowercase "ff6" but the build script uses uppercase "FF6" - verify this matches your system.
+`/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/`
 
 ## Debugging
 
 ### Log Files
 MelonLoader logs are located at:
-`/mnt/c/games/Final Fantasy I-VI Bundle Pixel Remaster/FF6/MelonLoader/Logs/`
+`/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/MelonLoader/Logs/`
 
 Logs are timestamped and new logs are created each game launch.
 

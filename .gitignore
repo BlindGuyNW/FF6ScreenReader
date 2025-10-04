@@ -1,5 +1,5 @@
 # Ignore the il2cpp decompilation since it's static.
-FFVI
+ff6
 
 # FFVI_Mod build artifacts and binaries
 FFVI_Mod/bin/

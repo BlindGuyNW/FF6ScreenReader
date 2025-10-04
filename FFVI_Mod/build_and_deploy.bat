@@ -18,7 +18,7 @@ if not exist "bin\Release\net6.0\FFVI_ScreenReader.dll" (
 )
 
 REM Deploy to game directory
-set "GAME_MODS_DIR=C:\games\Final Fantasy I-VI Bundle Pixel Remaster\FF6\Mods"
+set "GAME_MODS_DIR=C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VI PR\Mods"
 echo Deploying to: %GAME_MODS_DIR%
 
 REM Create Mods directory if it doesn't exist
