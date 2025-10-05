@@ -9,12 +9,121 @@ using Il2CppLast.UI.KeyInput;
 using Il2CppLast.UI.Message;
 using FFVI_ScreenReader.Core;
 using UnityEngine;
+using BattleCommandMessageController_KeyInput = Il2CppLast.UI.KeyInput.BattleCommandMessageController;
+using BattleCommandMessageController_Touch = Il2CppLast.UI.Touch.BattleCommandMessageController;
 
 namespace FFVI_ScreenReader.Patches
 {
     /// <summary>
     /// Patches for message display methods - View layer and scrolling messages
     /// </summary>
+
+    [HarmonyPatch(typeof(MessageWindowView), nameof(MessageWindowView.SetSpeker))]
+    public static class MessageWindowView_SetSpeker_Patch
+    {
+        private static string lastSpeaker = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(string value)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    lastSpeaker = "";
+                    return;
+                }
+
+                string cleanSpeaker = value.Trim();
+
+                // Skip duplicates
+                if (cleanSpeaker == lastSpeaker)
+                {
+                    return;
+                }
+
+                lastSpeaker = cleanSpeaker;
+                MelonLogger.Msg($"[Speaker] {cleanSpeaker}");
+                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in MessageWindowView.SetSpeker patch: {ex.Message}");
+            }
+        }
+    }
+
+    // Battle speaker announcements (KeyInput controls)
+    [HarmonyPatch(typeof(BattleCommandMessageController_KeyInput), nameof(BattleCommandMessageController_KeyInput.SetSpeaker))]
+    public static class BattleCommandMessageController_KeyInput_SetSpeaker_Patch
+    {
+        private static string lastSpeaker = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(string speakerName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(speakerName))
+                {
+                    lastSpeaker = "";
+                    return;
+                }
+
+                string cleanSpeaker = speakerName.Trim();
+
+                // Skip duplicates
+                if (cleanSpeaker == lastSpeaker)
+                {
+                    return;
+                }
+
+                lastSpeaker = cleanSpeaker;
+                MelonLogger.Msg($"[Battle Speaker] {cleanSpeaker}");
+                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleCommandMessageController KeyInput.SetSpeaker patch: {ex.Message}");
+            }
+        }
+    }
+
+    // Battle speaker announcements (Touch controls)
+    [HarmonyPatch(typeof(BattleCommandMessageController_Touch), nameof(BattleCommandMessageController_Touch.SetSpeaker))]
+    public static class BattleCommandMessageController_Touch_SetSpeaker_Patch
+    {
+        private static string lastSpeaker = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(string speakerName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(speakerName))
+                {
+                    lastSpeaker = "";
+                    return;
+                }
+
+                string cleanSpeaker = speakerName.Trim();
+
+                // Skip duplicates
+                if (cleanSpeaker == lastSpeaker)
+                {
+                    return;
+                }
+
+                lastSpeaker = cleanSpeaker;
+                MelonLogger.Msg($"[Battle Speaker Touch] {cleanSpeaker}");
+                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleCommandMessageController Touch.SetSpeaker patch: {ex.Message}");
+            }
+        }
+    }
 
     [HarmonyPatch(typeof(MessageWindowView), nameof(MessageWindowView.SetMessage))]
     public static class MessageWindowView_SetMessage_Patch
@@ -28,20 +137,41 @@ namespace FFVI_ScreenReader.Patches
             {
                 if (string.IsNullOrWhiteSpace(message))
                 {
+                    // If message is cleared, reset tracking
+                    if (!string.IsNullOrWhiteSpace(lastMessage))
+                    {
+                        lastMessage = "";
+                    }
                     return;
                 }
 
                 string cleanMessage = message.Trim();
 
-                // Skip duplicates
+                // Skip exact duplicates
                 if (cleanMessage == lastMessage)
                 {
                     return;
                 }
-                lastMessage = cleanMessage;
 
-                MelonLogger.Msg($"[MessageWindowView.SetMessage] {cleanMessage}");
-                FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                // Check if this is an incremental update (new message contains old message)
+                if (!string.IsNullOrWhiteSpace(lastMessage) && cleanMessage.StartsWith(lastMessage))
+                {
+                    // Only announce the new text that was added
+                    string newText = cleanMessage.Substring(lastMessage.Length).Trim();
+                    if (!string.IsNullOrWhiteSpace(newText))
+                    {
+                        MelonLogger.Msg($"[MessageWindowView.SetMessage - New] {newText}");
+                        FFVI_ScreenReaderMod.SpeakText(newText);
+                    }
+                }
+                else
+                {
+                    // This is a completely new message, announce it all
+                    MelonLogger.Msg($"[MessageWindowView.SetMessage - Full] {cleanMessage}");
+                    FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                }
+
+                lastMessage = cleanMessage;
             }
             catch (Exception ex)
             {
