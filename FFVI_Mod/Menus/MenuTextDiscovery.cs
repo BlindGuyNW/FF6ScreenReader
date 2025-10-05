@@ -95,27 +95,31 @@ namespace FFVI_ScreenReader.Menus
             menuText = SaveSlotReader.TryReadSaveSlot(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
 
-            // Strategy 2: Title-style approach (cursor moves in hierarchy)
+            // Strategy 2: Character selection (formation, status, equipment, etc.)
+            menuText = CharacterSelectionReader.TryReadCharacterSelection(cursor.transform, cursor.Index);
+            if (menuText != null) return menuText;
+
+            // Strategy 3: Title-style approach (cursor moves in hierarchy)
             menuText = TryDirectTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
-            // Strategy 3: Config-style menus (ConfigCommandView)
+            // Strategy 4: Config-style menus (ConfigCommandView)
             menuText = TryConfigCommandView(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 4: Battle menus with IconTextView (ability/item lists)
+            // Strategy 5: Battle menus with IconTextView (ability/item lists)
             menuText = TryIconTextView(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 5: Keyboard/Gamepad settings
+            // Strategy 6: Keyboard/Gamepad settings
             menuText = KeyboardGamepadReader.TryReadSettings(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
 
-            // Strategy 6: In-game config menu structure
+            // Strategy 7: In-game config menu structure
             menuText = TryInGameConfigMenu(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 7: Fallback with GetComponentInChildren
+            // Strategy 8: Fallback with GetComponentInChildren
             menuText = TryFallbackTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
