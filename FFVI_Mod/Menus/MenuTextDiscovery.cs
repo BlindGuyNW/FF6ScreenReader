@@ -91,27 +91,31 @@ namespace FFVI_ScreenReader.Menus
         {
             string menuText = null;
 
-            // Strategy 1: Title-style approach (cursor moves in hierarchy)
+            // Strategy 1: Save/Load slot information
+            menuText = SaveSlotReader.TryReadSaveSlot(cursor.transform, cursor.Index);
+            if (menuText != null) return menuText;
+
+            // Strategy 2: Title-style approach (cursor moves in hierarchy)
             menuText = TryDirectTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
-            // Strategy 2: Config-style menus (ConfigCommandView)
+            // Strategy 3: Config-style menus (ConfigCommandView)
             menuText = TryConfigCommandView(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 3: Battle menus with IconTextView (ability/item lists)
+            // Strategy 4: Battle menus with IconTextView (ability/item lists)
             menuText = TryIconTextView(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 4: Keyboard/Gamepad settings
+            // Strategy 5: Keyboard/Gamepad settings
             menuText = KeyboardGamepadReader.TryReadSettings(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
 
-            // Strategy 5: In-game config menu structure
+            // Strategy 6: In-game config menu structure
             menuText = TryInGameConfigMenu(cursor);
             if (menuText != null) return menuText;
 
-            // Strategy 6: Fallback with GetComponentInChildren
+            // Strategy 7: Fallback with GetComponentInChildren
             menuText = TryFallbackTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
@@ -119,7 +123,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 1: Walk up parent hierarchy looking for direct text components.
+        /// Strategy 2: Walk up parent hierarchy looking for direct text components.
         /// </summary>
         private static string TryDirectTextSearch(Transform cursorTransform)
         {
@@ -159,7 +163,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 2: Look for ConfigCommandView components.
+        /// Strategy 3: Look for ConfigCommandView components.
         /// </summary>
         private static string TryConfigCommandView(GameCursor cursor)
         {
@@ -298,7 +302,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 3: Battle menus with IconTextView (ability/item lists).
+        /// Strategy 4: Battle menus with IconTextView (ability/item lists).
         /// Battle menus use IconTextView components which wrap the actual Text component.
         /// </summary>
         private static string TryIconTextView(GameCursor cursor)
@@ -422,7 +426,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 5: In-game config menu structure.
+        /// Strategy 6: In-game config menu structure.
         /// </summary>
         private static string TryInGameConfigMenu(GameCursor cursor)
         {
@@ -510,7 +514,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 6: Final fallback with GetComponentInChildren.
+        /// Strategy 7: Final fallback with GetComponentInChildren.
         /// </summary>
         private static string TryFallbackTextSearch(Transform cursorTransform)
         {
