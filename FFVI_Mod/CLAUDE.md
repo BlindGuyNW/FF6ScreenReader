@@ -168,3 +168,148 @@ The mod includes extensive null checking because:
 - Il2Cpp objects can become invalid unexpectedly
 
 Always check `gameObject != null` before accessing properties, even after checking the transform exists.
+
+## Field Navigation and Pathfinding
+
+The mod includes collision-aware pathfinding for navigating to entities (NPCs, treasure, exits, etc.) on the field map. This implementation replicates the exact behavior of the game's touch controller by matching the native code in `FieldPlayerTouchRouteMoveController`.
+
+### Critical Implementation Details
+
+**IMPORTANT**: The pathfinding implementation uses several non-obvious techniques discovered through Ghidra decompilation of `GameAssembly.dll`. Do NOT "simplify" or "refactor" these without understanding why they exist.
+
+#### 1. Local Position vs World Position
+
+**Always use `transform.localPosition`, NEVER `transform.position`** for pathfinding:
+
+```csharp
+Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;  // ✓ Correct
+Vector3 targetPos = entityInfo.Entity.transform.localPosition;             // ✓ Correct
+
+Vector3 playerPos = playerController.fieldPlayer.transform.position;       // ✗ WRONG!
+```
+
+**Why?**
+- The pathfinding system works in **map-local coordinates** relative to the map's parent transform
+- `transform.position` includes parent offsets (camera, map scrolling, layer containers)
+- `transform.localPosition` gives coordinates relative to the map parent, which is what pathfinding expects
+- The touch controller (`FieldPlayerTouchRouteMoveController$OnTouchDownMap`) always uses `localPosition`
+
+#### 2. World-to-Cell Coordinate Conversion
+
+**Do NOT use `IMapAccessor.ConvertWorldPositionToCellPosition()`**. Instead, use the exact formula from `FieldPlayerTouchRouteMoveController$WorldPositionToCellPositionXY`:
+
+```csharp
+int mapWidth = mapHandle.GetCollisionLayerWidth();
+int mapHeight = mapHandle.GetCollisionLayerHeight();
+
+Vector3 startCell = new Vector3(
+    Mathf.FloorToInt(mapWidth * 0.5f + playerWorldPos.x * 0.0625f),
+    Mathf.FloorToInt(mapHeight * 0.5f - playerWorldPos.y * 0.0625f),  // Note: MINUS!
+    0
+);
+```
+
+**Key details:**
+- **0.0625 multiplier**: This is 1/16, because 16 world units = 1 cell
+- **Map center offset**: `mapWidth * 0.5` centers coordinates on the map origin
+- **Inverted Y axis**: Note the **minus sign** for Y! The cell coordinate system has inverted Y
+- **FloorToInt**: Must use floor, not round or truncate
+
+**Why not use ConvertWorldPositionToCellPosition?**
+- That method exists but does a different conversion (possibly for visual positions vs collision grid)
+- The touch controller explicitly implements its own conversion formula
+- Using the wrong conversion causes pathfinding to fail (returns no path or paths through walls)
+
+#### 3. Z Coordinate (Map Layer)
+
+Calculate Z from the player's Unity layer:
+
+```csharp
+float layerZ = player.gameObject.layer - 9;
+startCell.z = layerZ;
+```
+
+**Why `-9`?**
+- Unity layers 9, 10, 11 correspond to map layers 0, 1, 2
+- This is how the game maps Unity's layer system to its internal multi-layer map system
+- The touch controller does: `z = player.gameObject.layer - 9`
+
+#### 4. Multi-Layer Pathfinding Strategy
+
+The destination may be on a different layer than the player (e.g., stairs, exits). The touch controller searches layers to find walkable terrain:
+
+```csharp
+// Try pathfinding with different destination layers until one succeeds
+for (int tryDestZ = 2; tryDestZ >= 0; tryDestZ--)
+{
+    destCell.z = tryDestZ;
+    pathPoints = MapRouteSearcher.Search(mapHandle, startCell, destCell, playerCollisionState);
+
+    if (pathPoints != null && pathPoints.Count > 0)
+    {
+        break;  // Found a valid path!
+    }
+}
+
+// If all layers failed, fall back to collision=false
+if (pathPoints == null || pathPoints.Count == 0)
+{
+    destCell.z = startCell.z;
+    pathPoints = MapRouteSearcher.Search(mapHandle, startCell, destCell, false);
+}
+```
+
+**Why try multiple layers?**
+- When `player._IsOnCollision_k__BackingField == true`, `CalcCellPositionFromScreenPosition` searches layers 2→1→0 to find the first layer with walkable terrain at the destination
+- Different entities (stairs, exits, NPCs) may be on different map layers
+- The pathfinder can only route between positions on the **same layer**
+- Trying layers in descending order (2, 1, 0) matches the touch controller's behavior
+
+**Fallback to collision=false:**
+- If pathfinding fails on all three layers with collision checking enabled
+- Falls back to `collision=false` which uses a simpler algorithm that ignores walls
+- This ensures we always get *some* path (even if it's imperfect)
+- Better to show "West 5" through a wall than show "no path"
+
+#### 5. Player Collision State
+
+Pass the player's collision state to the pathfinder:
+
+```csharp
+bool playerCollisionState = player._IsOnCollision_k__BackingField;
+pathPoints = MapRouteSearcher.Search(mapHandle, startCell, destCell, playerCollisionState);
+```
+
+**What does this parameter do?**
+- `true`: Uses collision-aware pathfinding (avoids walls, checks terrain walkability)
+- `false`: Uses simple pathfinding that ignores collision (can path through walls)
+- The touch controller reads this from the player entity and passes it through
+
+**Important:** In keyboard/gamepad mode, `_IsOnCollision_k__BackingField` is typically `true`.
+
+### Reverse Engineering Notes
+
+This implementation was discovered by decompiling `GameAssembly.dll` with Ghidra and analyzing:
+
+1. **`FieldPlayerTouchRouteMoveController$OnTouchDownMap`**: How the touch controller initiates pathfinding
+2. **`FieldPlayerTouchRouteMoveController$WorldPositionToCellPositionXY`**: The exact coordinate conversion formula
+3. **`FieldPlayerTouchRouteMoveController$CalcCellPositionFromScreenPosition`**: Layer search logic for finding walkable terrain
+4. **`MapRouteSearcher$Search`**: The 4-parameter pathfinding method (not the simpler `SearchSimple`)
+
+Decompiled source reference: `/home/zkline/ffpr/ff6/Il2CppLast.Map/`
+
+### Common Pitfalls
+
+**Do NOT:**
+- ❌ Use `transform.position` (use `localPosition`)
+- ❌ Use `ConvertWorldPositionToCellPosition()` (use the 0.0625 formula)
+- ❌ Forget to invert Y axis (must use minus sign)
+- ❌ Set only one Z coordinate (must set both start and dest appropriately)
+- ❌ Skip the multi-layer search (entities can be on different layers)
+
+**Do:**
+- ✓ Always use `localPosition` for both player and target
+- ✓ Use the exact formula: `Floor((mapSize * 0.5) ± (localPos * 0.0625))`
+- ✓ Calculate Z from `player.gameObject.layer - 9`
+- ✓ Try layers 2, 1, 0 until pathfinding succeeds
+- ✓ Fall back to collision=false if all layers fail
