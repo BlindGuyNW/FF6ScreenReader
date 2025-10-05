@@ -109,9 +109,10 @@ namespace FFVI_ScreenReader.Field
                     if (info.ObjectType == Il2Cpp.MapConstants.ObjectType.GotoMap)
                     {
                         var gotoMapProperty = fieldEntity.Property.TryCast<Il2CppLast.Map.PropertyGotoMap>();
-                        if (gotoMapProperty != null && !string.IsNullOrEmpty(gotoMapProperty.AssetName))
+                        if (gotoMapProperty != null)
                         {
-                            info.Name = $"{info.Name} → {gotoMapProperty.AssetName}";
+                            string destinationName = MapNameResolver.GetMapExitName(gotoMapProperty);
+                            info.Name = $"{info.Name} → {destinationName}";
                         }
                     }
                 }
@@ -176,9 +177,10 @@ namespace FFVI_ScreenReader.Field
                     if (info.ObjectType == Il2Cpp.MapConstants.ObjectType.GotoMap)
                     {
                         var gotoMapProperty = entity.Property.TryCast<Il2CppLast.Map.PropertyGotoMap>();
-                        if (gotoMapProperty != null && !string.IsNullOrEmpty(gotoMapProperty.AssetName))
+                        if (gotoMapProperty != null)
                         {
-                            info.Name = $"{info.Name} → {gotoMapProperty.AssetName}";
+                            string destinationName = MapNameResolver.GetMapExitName(gotoMapProperty);
+                            info.Name = $"{info.Name} → {destinationName}";
                         }
                     }
                 }
