@@ -294,7 +294,7 @@ namespace FFVI_ScreenReader.Field
         /// <summary>
         /// Finds a path from player to target using the game's pathfinding system
         /// </summary>
-        public static PathInfo FindPathTo(Vector3 playerWorldPos, Vector3 targetWorldPos, IMapAccessor mapHandle)
+        public static PathInfo FindPathTo(Vector3 playerWorldPos, Vector3 targetWorldPos, IMapAccessor mapHandle, FieldPlayer player = null)
         {
             var pathInfo = new PathInfo { Success = false };
 
@@ -306,29 +306,83 @@ namespace FFVI_ScreenReader.Field
 
             try
             {
-                // Convert world positions to cell positions
-                Vector3 startCell = mapHandle.ConvertWorldPositionToCellPosition(playerWorldPos);
-                Vector3 destCell = mapHandle.ConvertWorldPositionToCellPosition(targetWorldPos);
+                // CRITICAL: Use the SAME conversion formula as the touch controller!
+                // Touch controller uses WorldPositionToCellPositionXY, NOT ConvertWorldPositionToCellPosition
+                int mapWidth = mapHandle.GetCollisionLayerWidth();
+                int mapHeight = mapHandle.GetCollisionLayerHeight();
+
+                // Touch controller formula: cellX = FloorToInt((mapWidth * 0.5) + (worldPos.x * 0.0625))
+                Vector3 startCell = new Vector3(
+                    Mathf.FloorToInt(mapWidth * 0.5f + playerWorldPos.x * 0.0625f),
+                    Mathf.FloorToInt(mapHeight * 0.5f - playerWorldPos.y * 0.0625f),  // Note: MINUS for Y!
+                    0
+                );
+
+                Vector3 destCell = new Vector3(
+                    Mathf.FloorToInt(mapWidth * 0.5f + targetWorldPos.x * 0.0625f),
+                    Mathf.FloorToInt(mapHeight * 0.5f - targetWorldPos.y * 0.0625f),
+                    0
+                );
+
+                // Set Z from player layer
+                if (player != null)
+                {
+                    float layerZ = player.gameObject.layer - 9;
+                    startCell.z = layerZ;
+
+                    MelonLoader.MelonLogger.Msg($"[Path] Player layer: {player.gameObject.layer}, Z: {layerZ}");
+                }
 
                 // DEBUG: Condensed coordinate logging
                 Vector3 worldDiff = targetWorldPos - playerWorldPos;
-                MelonLoader.MelonLogger.Msg($"[Path] Player→Target: World Δ({worldDiff.x:F0}, {worldDiff.y:F0}) Cell ({startCell.x:F0},{startCell.y:F0})→({destCell.x:F0},{destCell.y:F0})");
+                MelonLoader.MelonLogger.Msg($"[Path] Player→Target: World Δ({worldDiff.x:F0}, {worldDiff.y:F0}) Cell ({startCell.x:F0},{startCell.y:F0},{startCell.z:F0})→({destCell.x:F0},{destCell.y:F0},{destCell.z:F0})");
 
                 pathInfo.ErrorMessage = $"Debug: Start cell ({startCell.x:F1},{startCell.y:F1},{startCell.z:F1}) to dest ({destCell.x:F1},{destCell.y:F1},{destCell.z:F1})";
 
-                // Use Search with collisionEnabled=false (false = check collisions, true = ignore them?)
-                // NOTE: Despite taking cell coords as input, Search returns WORLD coordinates!
-                var pathPoints = Il2Cpp.MapRouteSearcher.Search(mapHandle, startCell, destCell, collisionEnabled: false);
+                // Use the REAL pathfinding method with player's collision state!
+                Il2CppSystem.Collections.Generic.List<Vector3> pathPoints = null;
+
+                if (player != null)
+                {
+                    bool playerCollisionState = player._IsOnCollision_k__BackingField;
+                    MelonLoader.MelonLogger.Msg($"[Path] player._IsOnCollision_k__BackingField = {playerCollisionState}");
+
+                    // Touch controller searches layers 2,1,0 when collision enabled to find walkable layer
+                    // Try pathfinding with different destination layers until one succeeds
+                    for (int tryDestZ = 2; tryDestZ >= 0; tryDestZ--)
+                    {
+                        destCell.z = tryDestZ;
+                        pathPoints = Il2Cpp.MapRouteSearcher.Search(mapHandle, startCell, destCell, playerCollisionState);
+
+                        if (pathPoints != null && pathPoints.Count > 0)
+                        {
+                            MelonLoader.MelonLogger.Msg($"[Path] SUCCESS: startZ={startCell.z}, destZ={destCell.z}, collision={playerCollisionState}");
+                            break;
+                        }
+                    }
+
+                    // If all layers failed, try collision=false as fallback
+                    if (pathPoints == null || pathPoints.Count == 0)
+                    {
+                        destCell.z = startCell.z;
+                        pathPoints = Il2Cpp.MapRouteSearcher.Search(mapHandle, startCell, destCell, false);
+                    }
+                }
+                else
+                {
+                    MelonLoader.MelonLogger.Msg("[Path] No player entity, falling back to SearchSimple");
+                    pathPoints = Il2Cpp.MapRouteSearcher.SearchSimple(mapHandle, startCell, destCell);
+                }
 
                 if (pathPoints == null)
                 {
-                    pathInfo.ErrorMessage += " - Search returned null (no path found)";
+                    pathInfo.ErrorMessage += " - Both collision states returned null";
                     return pathInfo;
                 }
 
                 if (pathPoints.Count == 0)
                 {
-                    pathInfo.ErrorMessage += " - Search returned empty list (no path found)";
+                    pathInfo.ErrorMessage += " - Both collision states returned empty";
                     return pathInfo;
                 }
 

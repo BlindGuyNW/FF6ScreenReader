@@ -131,14 +131,17 @@ namespace FFVI_ScreenReader.Core
             }
 
             var entityInfo = cachedEntities[currentEntityIndex];
-            Vector3 playerPos = playerController.fieldPlayer.transform.position;
+            // CRITICAL: Touch controller uses localPosition, NOT position!
+            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
+            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
 
-            // Pass current player position to get fresh direction/distance
-            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerPos);
+            // Pass current player position to get fresh direction/distance (use world position for display)
+            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerController.fieldPlayer.transform.position);
             var pathInfo = Field.FieldNavigationHelper.FindPathTo(
                 playerPos,
-                entityInfo.Position,
-                playerController.mapHandle
+                targetPos,
+                playerController.mapHandle,
+                playerController.fieldPlayer  // Pass the player entity!
             );
 
             string announcement;
