@@ -361,12 +361,8 @@ namespace FFVI_ScreenReader.Field
                         }
                     }
 
-                    // If all layers failed, try collision=false as fallback
-                    if (pathPoints == null || pathPoints.Count == 0)
-                    {
-                        destCell.z = startCell.z;
-                        pathPoints = Il2Cpp.MapRouteSearcher.Search(mapHandle, startCell, destCell, false);
-                    }
+                    // Don't fall back to collision=false - if we can't find a valid path, report failure
+                    // (collision=false would route through walls, which is misleading)
                 }
                 else
                 {
