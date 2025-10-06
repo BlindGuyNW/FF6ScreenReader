@@ -5,6 +5,15 @@ using Il2CppLast.UI.Touch;
 using MelonLoader;
 using UnityEngine;
 using GameCursor = Il2CppLast.UI.Cursor;
+using ConfigCommandView_Touch = Il2CppLast.UI.Touch.ConfigCommandView;
+using ConfigCommandView_KeyInput = Il2CppLast.UI.KeyInput.ConfigCommandView;
+using ConfigCommandController_Touch = Il2CppLast.UI.Touch.ConfigCommandController;
+using ConfigCommandController_KeyInput = Il2CppLast.UI.KeyInput.ConfigCommandController;
+using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
+using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
+using ConfigKeysSettingController = Il2CppLast.UI.KeyInput.ConfigKeysSettingController;
+using ConfigControllCommandController = Il2CppLast.UI.KeyInput.ConfigControllCommandController;
+using MessageManager = Il2CppLast.Management.MessageManager;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -99,11 +108,19 @@ namespace FFVI_ScreenReader.Menus
             menuText = CharacterSelectionReader.TryReadCharacterSelection(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
 
-            // Strategy 3: Title-style approach (cursor moves in hierarchy)
+            // Strategy 3: Try to read directly from ConfigActualDetailsControllerBase (most reliable for config menus)
+            menuText = TryReadFromConfigController(cursor);
+            if (menuText != null) return menuText;
+
+            // Strategy 4: Try to read directly from ConfigKeysSettingController (keyboard/gamepad settings)
+            menuText = TryReadFromKeysSettingController(cursor);
+            if (menuText != null) return menuText;
+
+            // Strategy 5: Title-style approach (cursor moves in hierarchy)
             menuText = TryDirectTextSearch(cursor.transform);
             if (menuText != null) return menuText;
 
-            // Strategy 4: Config-style menus (ConfigCommandView)
+            // Strategy 5: Config-style menus (ConfigCommandView)
             menuText = TryConfigCommandView(cursor);
             if (menuText != null) return menuText;
 
@@ -122,6 +139,252 @@ namespace FFVI_ScreenReader.Menus
             // Strategy 8: Fallback with GetComponentInChildren
             menuText = TryFallbackTextSearch(cursor.transform);
             if (menuText != null) return menuText;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Try to read menu item name directly from ConfigActualDetailsControllerBase.CommandList.
+        /// This is the most reliable method for config menus.
+        /// IMPORTANT: Only use this if cursor is actually in the config menu context.
+        /// </summary>
+        private static string TryReadFromConfigController(GameCursor cursor)
+        {
+            try
+            {
+                // Check if cursor is inside a dialog - if so, skip config controller
+                if (IsCursorInDialog(cursor.transform))
+                {
+                    MelonLogger.Msg("Cursor is in dialog, skipping config controller");
+                    return null;
+                }
+
+                int cursorIndex = cursor.Index;
+
+                // Try Touch version (title screen)
+                var controllerTouch = UnityEngine.Object.FindObjectOfType<ConfigActualDetailsControllerBase_Touch>();
+                if (controllerTouch != null && controllerTouch.CommandList != null)
+                {
+                    MelonLogger.Msg($"Found Touch ConfigActualDetailsControllerBase with {controllerTouch.CommandList.Count} commands");
+
+                    if (cursorIndex >= 0 && cursorIndex < controllerTouch.CommandList.Count)
+                    {
+                        var command = controllerTouch.CommandList[cursorIndex];
+                        if (command != null && command.view != null && command.view.nameText != null)
+                        {
+                            string menuText = command.view.nameText.text?.Trim();
+                            if (!string.IsNullOrEmpty(menuText))
+                            {
+                                MelonLogger.Msg($"Read name from Touch controller at index {cursorIndex}: '{menuText}'");
+                                return menuText;
+                            }
+                        }
+                    }
+                }
+
+                // Try KeyInput version (in-game)
+                var controllerKeyInput = UnityEngine.Object.FindObjectOfType<ConfigActualDetailsControllerBase_KeyInput>();
+                if (controllerKeyInput != null && controllerKeyInput.CommandList != null)
+                {
+                    MelonLogger.Msg($"Found KeyInput ConfigActualDetailsControllerBase with {controllerKeyInput.CommandList.Count} commands");
+
+                    if (cursorIndex >= 0 && cursorIndex < controllerKeyInput.CommandList.Count)
+                    {
+                        var command = controllerKeyInput.CommandList[cursorIndex];
+                        if (command != null && command.view != null && command.view.nameText != null)
+                        {
+                            string menuText = command.view.nameText.text?.Trim();
+                            if (!string.IsNullOrEmpty(menuText))
+                            {
+                                MelonLogger.Msg($"Read name from KeyInput controller at index {cursorIndex}: '{menuText}'");
+                                return menuText;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error reading from config controller: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Check if the cursor is inside a dialog/popup context.
+        /// </summary>
+        private static bool IsCursorInDialog(Transform cursorTransform)
+        {
+            try
+            {
+                // Walk up the cursor's parent hierarchy looking for dialog-related objects
+                Transform current = cursorTransform;
+                int depth = 0;
+                while (current != null && depth < 15)
+                {
+                    string name = current.name.ToLower();
+                    if (name.Contains("popup") || name.Contains("dialog") || name.Contains("prompt") ||
+                        name.Contains("message_window") || name.Contains("yesno") || name.Contains("confirm"))
+                    {
+                        MelonLogger.Msg($"Cursor is inside dialog: {current.name}");
+                        return true;
+                    }
+                    current = current.parent;
+                    depth++;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error checking cursor dialog context: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Try to read menu item name from ConfigKeysSettingController.
+        /// Handles keyboard, gamepad, and mouse settings menus.
+        /// </summary>
+        private static string TryReadFromKeysSettingController(GameCursor cursor)
+        {
+            try
+            {
+                // Check if cursor is in a dialog
+                if (IsCursorInDialog(cursor.transform))
+                {
+                    MelonLogger.Msg("Cursor is in dialog, skipping keys setting controller");
+                    return null;
+                }
+
+                int cursorIndex = cursor.Index;
+
+                // Find the ConfigKeysSettingController
+                var keysController = UnityEngine.Object.FindObjectOfType<ConfigKeysSettingController>();
+                if (keysController == null)
+                {
+                    return null;
+                }
+
+                MelonLogger.Msg("Found ConfigKeysSettingController");
+
+                // Determine which list to use based on which is populated and matches cursor index
+                // Try keyboard list first (most common)
+                if (keysController.keyboardCommandList != null &&
+                    cursorIndex >= 0 && cursorIndex < keysController.keyboardCommandList.Count)
+                {
+                    var command = keysController.keyboardCommandList[cursorIndex];
+                    if (command != null)
+                    {
+                        string text = ReadKeyCommandText(command);
+                        if (text != null)
+                        {
+                            MelonLogger.Msg($"Read from keyboard command list at index {cursorIndex}: '{text}'");
+                            return text;
+                        }
+                    }
+                }
+
+                // Try gamepad list
+                if (keysController.gamepadCommandList != null &&
+                    cursorIndex >= 0 && cursorIndex < keysController.gamepadCommandList.Count)
+                {
+                    var command = keysController.gamepadCommandList[cursorIndex];
+                    if (command != null)
+                    {
+                        string text = ReadKeyCommandText(command);
+                        if (text != null)
+                        {
+                            MelonLogger.Msg($"Read from gamepad command list at index {cursorIndex}: '{text}'");
+                            return text;
+                        }
+                    }
+                }
+
+                // Try mouse list
+                if (keysController.mouseCommandList != null &&
+                    cursorIndex >= 0 && cursorIndex < keysController.mouseCommandList.Count)
+                {
+                    var command = keysController.mouseCommandList[cursorIndex];
+                    if (command != null)
+                    {
+                        string text = ReadKeyCommandText(command);
+                        if (text != null)
+                        {
+                            MelonLogger.Msg($"Read from mouse command list at index {cursorIndex}: '{text}'");
+                            return text;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error reading from keys setting controller: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Read text from a ConfigControllCommandController.
+        /// Returns both the action name and the key binding (e.g., "Confirm Enter").
+        /// </summary>
+        private static string ReadKeyCommandText(ConfigControllCommandController command)
+        {
+            try
+            {
+                var textParts = new System.Collections.Generic.List<string>();
+
+                // First, get the localized action name from MessageId
+                if (!string.IsNullOrWhiteSpace(command.MessageId))
+                {
+                    try
+                    {
+                        var messageManager = MessageManager.Instance;
+                        if (messageManager != null)
+                        {
+                            string localizedText = messageManager.GetMessage(command.MessageId, false);
+                            if (!string.IsNullOrWhiteSpace(localizedText))
+                            {
+                                textParts.Add(localizedText.Trim());
+                                MelonLogger.Msg($"Localized MessageId '{command.MessageId}' to '{localizedText}'");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning($"Could not localize MessageId '{command.MessageId}': {ex.Message}");
+                    }
+                }
+
+                // Then, read all text components from messageTexts (includes key bindings)
+                if (command.messageTexts != null && command.messageTexts.Count > 0)
+                {
+                    foreach (var textComponent in command.messageTexts)
+                    {
+                        if (textComponent != null && !string.IsNullOrWhiteSpace(textComponent.text))
+                        {
+                            string text = textComponent.text.Trim();
+                            // Skip if it's the same as what we already got from MessageId
+                            // or if it's a localization key placeholder
+                            if (!text.StartsWith("MENU_") && !textParts.Contains(text))
+                            {
+                                textParts.Add(text);
+                            }
+                        }
+                    }
+                }
+
+                if (textParts.Count > 0)
+                {
+                    return string.Join(" ", textParts);
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error reading key command text: {ex.Message}");
+            }
 
             return null;
         }
@@ -167,7 +430,7 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
-        /// Strategy 3: Look for ConfigCommandView components.
+        /// Strategy 3: Look for ConfigCommandView components (both Touch and KeyInput versions).
         /// </summary>
         private static string TryConfigCommandView(GameCursor cursor)
         {
@@ -178,22 +441,40 @@ namespace FFVI_ScreenReader.Menus
 
                 while (current != null && hierarchyDepth < 10)
                 {
-                    var configView = current.GetComponent<ConfigCommandView>();
-                    if (configView != null && configView.nameText?.text != null)
+                    // Try Touch version (title screen config)
+                    var configViewTouch = current.GetComponent<ConfigCommandView_Touch>();
+                    if (configViewTouch != null && configViewTouch.nameText?.text != null)
                     {
-                        string menuText = configView.nameText.text.Trim();
-                        MelonLogger.Msg($"Found menu text: '{menuText}' from ConfigCommandView.nameText");
+                        string menuText = configViewTouch.nameText.text.Trim();
+                        MelonLogger.Msg($"Found menu text: '{menuText}' from Touch ConfigCommandView.nameText");
+                        return menuText;
+                    }
+
+                    // Try KeyInput version (in-game config)
+                    var configViewKeyInput = current.GetComponent<ConfigCommandView_KeyInput>();
+                    if (configViewKeyInput != null && configViewKeyInput.nameText?.text != null)
+                    {
+                        string menuText = configViewKeyInput.nameText.text.Trim();
+                        MelonLogger.Msg($"Found menu text: '{menuText}' from KeyInput ConfigCommandView.nameText");
                         return menuText;
                     }
 
                     // Check parent too
                     if (current.parent != null)
                     {
-                        configView = current.parent.GetComponent<ConfigCommandView>();
-                        if (configView != null && configView.nameText?.text != null)
+                        configViewTouch = current.parent.GetComponent<ConfigCommandView_Touch>();
+                        if (configViewTouch != null && configViewTouch.nameText?.text != null)
                         {
-                            string menuText = configView.nameText.text.Trim();
-                            MelonLogger.Msg($"Found menu text: '{menuText}' from parent ConfigCommandView.nameText");
+                            string menuText = configViewTouch.nameText.text.Trim();
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from parent Touch ConfigCommandView.nameText");
+                            return menuText;
+                        }
+
+                        configViewKeyInput = current.parent.GetComponent<ConfigCommandView_KeyInput>();
+                        if (configViewKeyInput != null && configViewKeyInput.nameText?.text != null)
+                        {
+                            string menuText = configViewKeyInput.nameText.text.Trim();
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from parent KeyInput ConfigCommandView.nameText");
                             return menuText;
                         }
                     }
@@ -238,21 +519,40 @@ namespace FFVI_ScreenReader.Menus
                         var rootChild = configItem.Find("root");
                         if (rootChild != null)
                         {
-                            var rootConfigView = rootChild.GetComponent<ConfigCommandView>();
-                            if (rootConfigView != null && rootConfigView.nameText?.text != null)
+                            // Try Touch version
+                            var rootConfigViewTouch = rootChild.GetComponent<ConfigCommandView_Touch>();
+                            if (rootConfigViewTouch != null && rootConfigViewTouch.nameText?.text != null)
                             {
-                                string menuText = rootConfigView.nameText.text.Trim();
-                                MelonLogger.Msg($"Found menu text from root ConfigCommandView: '{menuText}'");
+                                string menuText = rootConfigViewTouch.nameText.text.Trim();
+                                MelonLogger.Msg($"Found menu text from root Touch ConfigCommandView: '{menuText}'");
+                                return menuText;
+                            }
+
+                            // Try KeyInput version
+                            var rootConfigViewKeyInput = rootChild.GetComponent<ConfigCommandView_KeyInput>();
+                            if (rootConfigViewKeyInput != null && rootConfigViewKeyInput.nameText?.text != null)
+                            {
+                                string menuText = rootConfigViewKeyInput.nameText.text.Trim();
+                                MelonLogger.Msg($"Found menu text from root KeyInput ConfigCommandView: '{menuText}'");
                                 return menuText;
                             }
                         }
 
-                        // Look for ConfigCommandView anywhere in the item
-                        var itemConfigView = configItem.GetComponentInChildren<ConfigCommandView>();
-                        if (itemConfigView != null && itemConfigView.nameText?.text != null)
+                        // Look for ConfigCommandView anywhere in the item (Touch version)
+                        var itemConfigViewTouch = configItem.GetComponentInChildren<ConfigCommandView_Touch>();
+                        if (itemConfigViewTouch != null && itemConfigViewTouch.nameText?.text != null)
                         {
-                            string menuText = itemConfigView.nameText.text.Trim();
-                            MelonLogger.Msg($"Found menu text: '{menuText}' from config item ConfigCommandView");
+                            string menuText = itemConfigViewTouch.nameText.text.Trim();
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from config item Touch ConfigCommandView");
+                            return menuText;
+                        }
+
+                        // Look for ConfigCommandView anywhere in the item (KeyInput version)
+                        var itemConfigViewKeyInput = configItem.GetComponentInChildren<ConfigCommandView_KeyInput>();
+                        if (itemConfigViewKeyInput != null && itemConfigViewKeyInput.nameText?.text != null)
+                        {
+                            string menuText = itemConfigViewKeyInput.nameText.text.Trim();
+                            MelonLogger.Msg($"Found menu text: '{menuText}' from config item KeyInput ConfigCommandView");
                             return menuText;
                         }
 
@@ -476,12 +776,21 @@ namespace FFVI_ScreenReader.Menus
                                 }
                             }
 
-                            // Alternative: Look for ConfigCommandView directly
-                            var commandView = menuItem.GetComponentInChildren<ConfigCommandView>();
-                            if (commandView != null && commandView.nameText != null)
+                            // Alternative: Look for ConfigCommandView directly (Touch version)
+                            var commandViewTouch = menuItem.GetComponentInChildren<ConfigCommandView_Touch>();
+                            if (commandViewTouch != null && commandViewTouch.nameText != null)
                             {
-                                string menuText = commandView.nameText.text.Trim();
-                                MelonLogger.Msg($"Got text from ConfigCommandView.nameText: '{menuText}'");
+                                string menuText = commandViewTouch.nameText.text.Trim();
+                                MelonLogger.Msg($"Got text from Touch ConfigCommandView.nameText: '{menuText}'");
+                                return menuText;
+                            }
+
+                            // Alternative: Look for ConfigCommandView directly (KeyInput version)
+                            var commandViewKeyInput = menuItem.GetComponentInChildren<ConfigCommandView_KeyInput>();
+                            if (commandViewKeyInput != null && commandViewKeyInput.nameText != null)
+                            {
+                                string menuText = commandViewKeyInput.nameText.text.Trim();
+                                MelonLogger.Msg($"Got text from KeyInput ConfigCommandView.nameText: '{menuText}'");
                                 return menuText;
                             }
 
