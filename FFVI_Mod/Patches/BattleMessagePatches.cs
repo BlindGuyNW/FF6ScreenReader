@@ -204,6 +204,83 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
+    [HarmonyPatch(typeof(Il2CppLast.Battle.Function.BattleBasicFunction), nameof(Il2CppLast.Battle.Function.BattleBasicFunction.CreateDamageView))]
+    public static class BattleBasicFunction_CreateDamageView_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(Il2CppLast.Battle.BattleUnitData data, int value, bool isRecovery)
+        {
+            try
+            {
+                string targetName = "Unknown";
+
+                // Check if this is a BattlePlayerData (player character)
+                var playerData = data.TryCast<Il2Cpp.BattlePlayerData>();
+                if (playerData != null)
+                {
+                    try
+                    {
+                        var ownedCharData = playerData.ownedCharacterData;
+                        if (ownedCharData != null)
+                        {
+                            targetName = ownedCharData.Name;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning($"Error getting player name: {ex.Message}");
+                    }
+                }
+
+                // Check if this is a BattleEnemyData (enemy)
+                var enemyData = data.TryCast<Il2CppLast.Battle.BattleEnemyData>();
+                if (enemyData != null)
+                {
+                    try
+                    {
+                        string mesIdName = enemyData.GetMesIdName();
+                        var messageManager = Il2CppLast.Management.MessageManager.Instance;
+                        if (messageManager != null && !string.IsNullOrEmpty(mesIdName))
+                        {
+                            string localizedName = messageManager.GetMessage(mesIdName);
+                            if (!string.IsNullOrEmpty(localizedName))
+                            {
+                                targetName = localizedName;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning($"Error getting enemy name: {ex.Message}");
+                    }
+                }
+
+                string message;
+                if (value == 0)
+                {
+                    message = $"{targetName}: Miss";
+                }
+                else if (isRecovery)
+                {
+                    message = $"{targetName}: Recovered {value}";
+                }
+                else
+                {
+                    message = $"{targetName}: {value} damage";
+                }
+
+                MelonLogger.Msg($"[Damage] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleBasicFunction.CreateDamageView patch: {ex.Message}");
+            }
+        }
+    }
+
+    // OLD PATCH - Disabled in favor of BattleBasicFunction patch which has better access to enemy data
+    /*
     [HarmonyPatch(typeof(DamageViewUIManager), nameof(DamageViewUIManager.CreateDamgeView))]
     public static class DamageViewUIManager_CreateDamgeView_Patch
     {
@@ -212,16 +289,8 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Try to identify the target
-                string targetName = "Unknown";
-                if (transform != null)
-                {
-                    // Try to get name from transform hierarchy
-                    targetName = transform.gameObject.name;
-
-                    // Log the transform name for debugging
-                    MelonLogger.Msg($"[Damage Target] Transform name: {targetName}");
-                }
+                // Try to identify the target by walking up the hierarchy
+                string targetName = GetTargetNameFromHierarchy(transform);
 
                 string message;
                 if (isMiss)
@@ -245,7 +314,148 @@ namespace FFVI_ScreenReader.Patches
                 MelonLogger.Warning($"Error in CreateDamgeView patch: {ex.Message}");
             }
         }
+
+        private static string GetTargetNameFromHierarchy(Transform transform)
+        {
+            if (transform == null)
+                return "Unknown";
+
+            try
+            {
+                // Strategy 1: Try specific known component types on the hierarchy
+                Transform current = transform;
+                for (int depth = 0; depth < 5 && current != null; depth++)
+                {
+                    if (current.gameObject != null)
+                    {
+                        string objName = current.gameObject.name;
+                        MelonLogger.Msg($"[Damage Debug] Depth {depth}: GameObject '{objName}'");
+
+                        // Check if this is a BattlePlayerEntity (player character)
+                        var playerEntity = current.GetComponent<Il2CppLast.Battle.BattlePlayerEntity>();
+                        if (playerEntity != null)
+                        {
+                            MelonLogger.Msg($"[Damage Debug]   Has BattlePlayerEntity");
+                            MelonLogger.Msg($"[Damage Debug]     characterStatusId: {playerEntity.characterStatusId}");
+                            MelonLogger.Msg($"[Damage Debug]     corpsIndex: {playerEntity.corpsIndex}");
+
+                            // Get character name from corps index
+                            try
+                            {
+                                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
+                                if (userDataManager != null)
+                                {
+                                    var corpsList = userDataManager.GetCorpsListClone();
+                                    if (corpsList != null && playerEntity.corpsIndex >= 0 && playerEntity.corpsIndex < corpsList.Count)
+                                    {
+                                        var corps = corpsList[playerEntity.corpsIndex];
+                                        if (corps != null)
+                                        {
+                                            int characterId = corps.CharacterId;
+                                            MelonLogger.Msg($"[Damage Debug]     Corps CharacterId: {characterId}");
+
+                                            // Now get character data from character ID
+                                            var ownedCharacterList = userDataManager.GetOwnedCharactersClone(false);
+                                            if (ownedCharacterList != null)
+                                            {
+                                                foreach (var ownedChar in ownedCharacterList)
+                                                {
+                                                    if (ownedChar != null && ownedChar.Id == characterId)
+                                                    {
+                                                        string name = ownedChar.Name;
+                                                        MelonLogger.Msg($"[Damage Debug]     Character name: {name}");
+                                                        return name;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                MelonLogger.Warning($"Error getting character name: {ex.Message}");
+                            }
+
+                            return $"Player {playerEntity.corpsIndex}";
+                        }
+
+                        // Check if this is a BattleEnemyEntity (enemy)
+                        var enemyEntity = current.GetComponent<Il2CppLast.Battle.BattleEnemyEntity>();
+                        if (enemyEntity != null)
+                        {
+                            MelonLogger.Msg($"[Damage Debug]   Has BattleEnemyEntity");
+                            MelonLogger.Msg($"[Damage Debug]     monsterAssetId: {enemyEntity.monsterAssetId}");
+
+                            // Search Monster.templateList for a Monster with matching MonsterAssetId
+                            try
+                            {
+                                var monsterTemplateList = Il2CppLast.Data.Master.Monster.templateList;
+                                if (monsterTemplateList != null)
+                                {
+                                    MelonLogger.Msg($"[Damage Debug]   Searching Monster.templateList (count: {monsterTemplateList.Count})");
+
+                                    foreach (var kvp in monsterTemplateList)
+                                    {
+                                        try
+                                        {
+                                            // Cast the value to Monster
+                                            var monsterObj = Il2CppInterop.Runtime.Runtime.Il2CppObjectPool.Get<Il2CppLast.Data.Master.Monster>(kvp.Value.Pointer);
+                                            if (monsterObj != null)
+                                            {
+                                                // Check if MonsterAssetId matches
+                                                if (monsterObj.MonsterAssetId == enemyEntity.monsterAssetId)
+                                                {
+                                                    MelonLogger.Msg($"[Damage Debug]   Found matching Monster! ID: {kvp.Key}, MonsterAssetId: {monsterObj.MonsterAssetId}");
+                                                    MelonLogger.Msg($"[Damage Debug]     MesIdName: {monsterObj.MesIdName}");
+
+                                                    // Get the localized name using the MesIdName
+                                                    var messageManager = Il2CppLast.Management.MessageManager.Instance;
+                                                    if (messageManager != null)
+                                                    {
+                                                        string localizedName = messageManager.GetMessage(monsterObj.MesIdName);
+                                                        if (!string.IsNullOrEmpty(localizedName))
+                                                        {
+                                                            MelonLogger.Msg($"[Damage Debug]     Localized name: {localizedName}");
+                                                            return localizedName;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        catch (Exception innerEx)
+                                        {
+                                            // Silently skip entries that can't be cast
+                                            continue;
+                                        }
+                                    }
+                                    MelonLogger.Msg($"[Damage Debug]   No matching Monster found for MonsterAssetId {enemyEntity.monsterAssetId}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                MelonLogger.Warning($"[Damage Debug] Error searching Monster.templateList: {ex.Message}");
+                            }
+
+                            return $"Enemy {enemyEntity.monsterAssetId}";
+                        }
+                    }
+                    current = current.parent;
+                }
+
+                // Fallback - use the immediate transform name
+                string fallbackName = transform.gameObject.name;
+                MelonLogger.Msg($"[Damage Target] Using fallback: {fallbackName}");
+                return fallbackName;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error getting target name from hierarchy: {ex.Message}");
+                return "Unknown";
+            }
+        }
     }
+    */
 
     [HarmonyPatch(typeof(DamageViewUIManager), nameof(DamageViewUIManager.CreateHitCount))]
     public static class DamageViewUIManager_CreateHitCount_Patch
