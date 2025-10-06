@@ -523,12 +523,16 @@ namespace FFVI_ScreenReader.Patches
     public static class BattleMenuController_SetCommandSelectTarget_Patch
     {
         private static string lastCharacter = "";
+        public static Il2Cpp.BattlePlayerData CurrentActiveCharacter = null;
 
         [HarmonyPostfix]
         public static void Postfix(Il2Cpp.BattlePlayerData targetData)
         {
             try
             {
+                // Store the currently active character for health/status readouts
+                CurrentActiveCharacter = targetData;
+
                 if (targetData != null && targetData.ownedCharacterData != null)
                 {
                     string characterName = targetData.ownedCharacterData.Name;
@@ -684,6 +688,123 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in BattleUIManager.SetSystemMessage patch: {ex.Message}");
+            }
+        }
+    }
+
+    // Patch BattleTargetSelectController.SelectContent to announce player names during friendly targeting
+    [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData>), typeof(int) })]
+    public static class BattleTargetSelectController_SelectContent_Player_Patch
+    {
+        private static string lastPlayerName = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData> list, int index)
+        {
+            try
+            {
+                if (list == null)
+                {
+                    return;
+                }
+
+                // Convert IEnumerable to List to access by index
+                var playerList = list.TryCast<Il2CppSystem.Collections.Generic.List<Il2Cpp.BattlePlayerData>>();
+                if (playerList == null || playerList.Count == 0)
+                {
+                    return;
+                }
+
+                // Get the player at the specified index
+                if (index >= 0 && index < playerList.Count)
+                {
+                    var selectedPlayer = playerList[index];
+                    if (selectedPlayer != null && selectedPlayer.ownedCharacterData != null)
+                    {
+                        string characterName = selectedPlayer.ownedCharacterData.Name;
+                        if (!string.IsNullOrEmpty(characterName))
+                        {
+                            // Skip duplicates
+                            if (characterName == lastPlayerName)
+                            {
+                                return;
+                            }
+                            lastPlayerName = characterName;
+
+                            MelonLogger.Msg($"[Player Target] {characterName}");
+                            FFVI_ScreenReaderMod.SpeakText(characterName);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleTargetSelectController.SelectContent (player) patch: {ex.Message}");
+            }
+        }
+    }
+
+    // Patch BattleTargetSelectController.SelectContent to announce enemy names during targeting
+    [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData>), typeof(int) })]
+    public static class BattleTargetSelectController_SelectContent_Enemy_Patch
+    {
+        private static string lastEnemyName = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData> list, int index)
+        {
+            try
+            {
+                if (list == null)
+                {
+                    return;
+                }
+
+                // Convert IEnumerable to array to access by index
+                // Try to cast to List first
+                var enemyList = list.TryCast<Il2CppSystem.Collections.Generic.List<Il2CppLast.Battle.BattleEnemyData>>();
+                if (enemyList == null || enemyList.Count == 0)
+                {
+                    return;
+                }
+
+                // Get the enemy at the specified index
+                if (index >= 0 && index < enemyList.Count)
+                {
+                    var selectedEnemy = enemyList[index];
+                    if (selectedEnemy != null)
+                    {
+                        try
+                        {
+                            string mesIdName = selectedEnemy.GetMesIdName();
+                            var messageManager = Il2CppLast.Management.MessageManager.Instance;
+                            if (messageManager != null && !string.IsNullOrEmpty(mesIdName))
+                            {
+                                string localizedName = messageManager.GetMessage(mesIdName);
+                                if (!string.IsNullOrEmpty(localizedName))
+                                {
+                                    // Skip duplicates
+                                    if (localizedName == lastEnemyName)
+                                    {
+                                        return;
+                                    }
+                                    lastEnemyName = localizedName;
+
+                                    MelonLogger.Msg($"[Enemy Target] {localizedName}");
+                                    FFVI_ScreenReaderMod.SpeakText(localizedName);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MelonLogger.Warning($"Error getting enemy name: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleTargetSelectController.SelectContent patch: {ex.Message}");
             }
         }
     }

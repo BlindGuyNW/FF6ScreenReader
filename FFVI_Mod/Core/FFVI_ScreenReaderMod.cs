@@ -73,6 +73,12 @@ namespace FFVI_ScreenReader.Core
             {
                 AutoNavigateToCurrentEntity();
             }
+
+            // Hotkey: H to announce current character's health/status in battle
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.H))
+            {
+                AnnounceCurrentCharacterStatus();
+            }
         }
 
         private void RescanEntities()
@@ -216,6 +222,91 @@ namespace FFVI_ScreenReader.Core
 
             SpeakText($"Walking to {entityInfo.Name}");
             LoggerInstance.Msg($"Auto-navigating to {entityInfo.Name} at {entityInfo.Position}");
+        }
+
+        private void AnnounceCurrentCharacterStatus()
+        {
+            try
+            {
+                // Get the currently active character from the battle patch
+                var activeCharacter = FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter;
+
+                if (activeCharacter == null)
+                {
+                    SpeakText("Not in battle or no active character");
+                    return;
+                }
+
+                if (activeCharacter.ownedCharacterData == null)
+                {
+                    SpeakText("No character data available");
+                    return;
+                }
+
+                var charData = activeCharacter.ownedCharacterData;
+                string characterName = charData.Name;
+
+                // Read HP/MP directly from character parameter
+                if (charData.parameter == null)
+                {
+                    SpeakText($"{characterName}, status information not available");
+                    return;
+                }
+
+                var param = charData.parameter;
+                var statusParts = new System.Collections.Generic.List<string>();
+                statusParts.Add(characterName);
+
+                // Add HP
+                int currentHP = param.CurrentHP;
+                int maxHP = param.ConfirmedMaxHp();
+                statusParts.Add($"HP {currentHP} of {maxHP}");
+
+                // Add MP
+                int currentMP = param.CurrentMP;
+                int maxMP = param.ConfirmedMaxMp();
+                statusParts.Add($"MP {currentMP} of {maxMP}");
+
+                // Add status conditions
+                if (param.CurrentConditionList != null && param.CurrentConditionList.Count > 0)
+                {
+                    var conditionNames = new System.Collections.Generic.List<string>();
+                    foreach (var condition in param.CurrentConditionList)
+                    {
+                        if (condition != null)
+                        {
+                            // Get the condition name from the message ID
+                            string conditionMesId = condition.MesIdName;
+                            if (!string.IsNullOrEmpty(conditionMesId))
+                            {
+                                var messageManager = Il2CppLast.Management.MessageManager.Instance;
+                                if (messageManager != null)
+                                {
+                                    string conditionName = messageManager.GetMessage(conditionMesId);
+                                    if (!string.IsNullOrEmpty(conditionName))
+                                    {
+                                        conditionNames.Add(conditionName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (conditionNames.Count > 0)
+                    {
+                        statusParts.Add("Status: " + string.Join(", ", conditionNames));
+                    }
+                }
+
+                string statusMessage = string.Join(", ", statusParts);
+                LoggerInstance.Msg($"[Character Status] {statusMessage}");
+                SpeakText(statusMessage);
+            }
+            catch (System.Exception ex)
+            {
+                LoggerInstance.Warning($"Error announcing character status: {ex.Message}");
+                SpeakText("Error reading character status");
+            }
         }
 
         /// <summary>

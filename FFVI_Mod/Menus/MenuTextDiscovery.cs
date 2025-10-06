@@ -100,6 +100,10 @@ namespace FFVI_ScreenReader.Menus
         {
             string menuText = null;
 
+            // Strategy 0: Battle enemy targeting (check first as it's very specific)
+            menuText = TryReadBattleEnemyTarget(cursor);
+            if (menuText != null) return menuText;
+
             // Strategy 1: Save/Load slot information
             menuText = SaveSlotReader.TryReadSaveSlot(cursor.transform, cursor.Index);
             if (menuText != null) return menuText;
@@ -139,6 +143,53 @@ namespace FFVI_ScreenReader.Menus
             // Strategy 8: Fallback with GetComponentInChildren
             menuText = TryFallbackTextSearch(cursor.transform);
             if (menuText != null) return menuText;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Strategy 0: Try to read enemy name during battle targeting.
+        /// Checks for BattleEnemyEntity objects and logs hierarchy for debugging.
+        /// </summary>
+        private static string TryReadBattleEnemyTarget(GameCursor cursor)
+        {
+            try
+            {
+                // Check if we're in battle by looking for BattleEnemyEntity
+                var enemyEntities = UnityEngine.Object.FindObjectsOfType<Il2CppLast.Battle.BattleEnemyEntity>();
+                if (enemyEntities == null || enemyEntities.Length == 0)
+                {
+                    // Not in battle
+                    return null;
+                }
+
+                MelonLogger.Msg($"[Battle Enemy] In battle with {enemyEntities.Length} enemies, cursor at index {cursor.Index}");
+
+                // Log the cursor hierarchy to see where enemy names might be
+                Transform current = cursor.transform;
+                for (int depth = 0; depth < 10 && current != null; depth++)
+                {
+                    var texts = current.GetComponentsInChildren<UnityEngine.UI.Text>();
+                    if (texts != null && texts.Length > 0)
+                    {
+                        foreach (var text in texts)
+                        {
+                            if (text != null && !string.IsNullOrWhiteSpace(text.text))
+                            {
+                                MelonLogger.Msg($"[Battle Enemy] Depth {depth}, Text on '{text.gameObject.name}': '{text.text}'");
+                            }
+                        }
+                    }
+                    current = current.parent;
+                }
+
+                // For now, return null to let fallback handle it
+                // Once we see the logs we'll know where to find the enemy name
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error reading battle enemy target: {ex.Message}");
+            }
 
             return null;
         }
