@@ -83,6 +83,40 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is item menu navigation (handled by ItemListController.SelectContent patch)
+                // Only skip for list_window (the actual item list), not item_info (which includes the command menu)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("list_window"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment menu navigation (handled by EquipmentSelectWindowController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment slot navigation (handled by EquipmentInfoWindowController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -170,6 +204,40 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is item menu navigation (handled by ItemListController.SelectContent patch)
+                // Only skip for list_window (the actual item list), not item_info (which includes the command menu)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("list_window"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment menu navigation (handled by EquipmentSelectWindowController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment slot navigation (handled by EquipmentInfoWindowController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -213,6 +281,84 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
+                var parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("item_target_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("battle_target"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is title menu navigation (handled by TitleMenuCommandController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("title_command") || parent.name.Contains("TitleMenu"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("config") || parent.name.Contains("Config"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is item menu navigation (handled by ItemListController.SelectContent patch)
+                // Only skip for list_window (the actual item list), not item_info (which includes the command menu)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("list_window"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment menu navigation (handled by EquipmentSelectWindowController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment slot navigation (handled by EquipmentInfoWindowController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -254,6 +400,84 @@ namespace FFVI_ScreenReader.Patches
                 {
                     MelonLogger.Msg("GameCursor transform is null in SkipPrevIndex patch");
                     return;
+                }
+
+                // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
+                var parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("item_target_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("battle_target"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is title menu navigation (handled by TitleMenuCommandController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("title_command") || parent.name.Contains("TitleMenu"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("config") || parent.name.Contains("Config"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is item menu navigation (handled by ItemListController.SelectContent patch)
+                // Only skip for list_window (the actual item list), not item_info (which includes the command menu)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("list_window"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment menu navigation (handled by EquipmentSelectWindowController.SetCursor patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is equipment slot navigation (handled by EquipmentInfoWindowController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
                 }
 
                 // Use managed coroutine system

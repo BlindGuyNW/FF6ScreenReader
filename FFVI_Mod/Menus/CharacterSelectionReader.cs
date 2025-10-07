@@ -56,8 +56,28 @@ namespace FFVI_ScreenReader.Menus
                     }
 
                     // Also check if we're directly on a character info element
+                    // BUT skip if this is the equipment slot screen (handled by EquipmentInfoWindowController.UpdateView patch)
                     if (current.name.Contains("info_content") || current.name.Contains("status_info"))
                     {
+                        // Check if this is equipment slot navigation (has part_text and last_text)
+                        var texts = current.GetComponentsInChildren<UnityEngine.UI.Text>(true);
+                        bool hasPartText = false;
+                        bool hasLastText = false;
+                        foreach (var t in texts)
+                        {
+                            if (t != null && t.name != null)
+                            {
+                                if (t.name.Contains("part_text")) hasPartText = true;
+                                if (t.name.Contains("last_text")) hasLastText = true;
+                            }
+                        }
+
+                        if (hasPartText && hasLastText)
+                        {
+                            MelonLogger.Msg("Skipping equipment slot navigation (handled by EquipmentInfoWindowController patch)");
+                            return null;
+                        }
+
                         MelonLogger.Msg($"Found character info element: {current.name}");
                         string characterInfo = ReadCharacterInformation(current, cursorIndex);
                         if (characterInfo != null)
