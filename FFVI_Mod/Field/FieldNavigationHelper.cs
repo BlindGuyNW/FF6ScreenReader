@@ -363,6 +363,54 @@ namespace FFVI_ScreenReader.Field
                         }
                     }
 
+                    // If direct path failed, try adjacent tiles
+                    if (pathPoints == null || pathPoints.Count == 0)
+                    {
+                        MelonLoader.MelonLogger.Msg("[Path] Direct path failed, trying adjacent tiles...");
+
+                        // Try adjacent tiles (one cell = 16 units in world space)
+                        // Try all 8 directions: cardinals first, then diagonals
+                        Vector3[] adjacentOffsets = new Vector3[] {
+                            new Vector3(0, 16, 0),    // north
+                            new Vector3(16, 0, 0),    // east
+                            new Vector3(0, -16, 0),   // south
+                            new Vector3(-16, 0, 0),   // west
+                            new Vector3(16, 16, 0),   // northeast
+                            new Vector3(16, -16, 0),  // southeast
+                            new Vector3(-16, -16, 0), // southwest
+                            new Vector3(-16, 16, 0)   // northwest
+                        };
+
+                        foreach (var offset in adjacentOffsets)
+                        {
+                            Vector3 adjacentTargetWorld = targetWorldPos + offset;
+
+                            // Convert to cell coordinates
+                            Vector3 adjacentDestCell = new Vector3(
+                                Mathf.FloorToInt(mapWidth * 0.5f + adjacentTargetWorld.x * 0.0625f),
+                                Mathf.FloorToInt(mapHeight * 0.5f - adjacentTargetWorld.y * 0.0625f),
+                                0
+                            );
+
+                            // Try pathfinding with different layers
+                            for (int tryDestZ = 2; tryDestZ >= 0; tryDestZ--)
+                            {
+                                adjacentDestCell.z = tryDestZ;
+                                pathPoints = Il2Cpp.MapRouteSearcher.Search(mapHandle, startCell, adjacentDestCell, playerCollisionState);
+
+                                if (pathPoints != null && pathPoints.Count > 0)
+                                {
+                                    MelonLoader.MelonLogger.Msg($"[Path] SUCCESS with adjacent tile (offset {offset}): startZ={startCell.z}, destZ={adjacentDestCell.z}");
+                                    break;
+                                }
+                            }
+
+                            // If we found a path, stop trying other adjacent tiles
+                            if (pathPoints != null && pathPoints.Count > 0)
+                                break;
+                        }
+                    }
+
                     // Don't fall back to collision=false - if we can't find a valid path, report failure
                     // (collision=false would route through walls, which is misleading)
                 }
@@ -374,13 +422,13 @@ namespace FFVI_ScreenReader.Field
 
                 if (pathPoints == null)
                 {
-                    pathInfo.ErrorMessage += " - Both collision states returned null";
+                    pathInfo.ErrorMessage += " - Direct and adjacent paths returned null";
                     return pathInfo;
                 }
 
                 if (pathPoints.Count == 0)
                 {
-                    pathInfo.ErrorMessage += " - Both collision states returned empty";
+                    pathInfo.ErrorMessage += " - Direct and adjacent paths returned empty";
                     return pathInfo;
                 }
 
