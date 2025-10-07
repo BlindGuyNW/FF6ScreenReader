@@ -465,13 +465,6 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Log what we can see about the target
-                if (target != null)
-                {
-                    MelonLogger.Msg($"[Hit Count Target] Type: {target.GetType().FullName}");
-                    MelonLogger.Msg($"[Hit Count Target] ToString: {target.ToString()}");
-                }
-
                 string message = $"{hitCountValue} hits";
                 MelonLogger.Msg($"[Hit Count] {message}");
                 FFVI_ScreenReaderMod.SpeakText(message);
@@ -559,24 +552,6 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
-    // Patch SetOnCommandDone to inspect BattleActData when commands are executed
-    [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleMenuController), nameof(Il2CppLast.UI.KeyInput.BattleMenuController.SetOnCommandDone))]
-    public static class BattleMenuController_SetOnCommandDone_Patch
-    {
-        [HarmonyPrefix]
-        public static void Prefix(Il2CppSystem.Action<Il2CppSystem.Collections.Generic.List<Il2CppLast.Battle.BattleActData>> callback)
-        {
-            try
-            {
-                MelonLogger.Msg($"[BattleActData] SetOnCommandDone called, setting up callback wrapper");
-                // We can't easily inspect the callback, but we know it gets called with BattleActData
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"Error in SetOnCommandDone patch: {ex.Message}");
-            }
-        }
-    }
 
     [HarmonyPatch(typeof(Il2CppLast.UI.Touch.BattleCommandMessageController), nameof(Il2CppLast.UI.Touch.BattleCommandMessageController.SetSystemMessage))]
     public static class BattleCommandMessageController_SetSystemMessage_Patch
@@ -612,33 +587,6 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
-    // Try patching BattleUIManager methods directly
-    [HarmonyPatch(typeof(BattleUIManager), nameof(BattleUIManager.SetCommadnMessage))]
-    public static class BattleUIManager_SetCommadnMessage_Patch
-    {
-        [HarmonyPostfix]
-        public static void Postfix(BattleUIManager __instance, string messageId)
-        {
-            try
-            {
-                MelonLogger.Msg($"[BattleUIManager.SetCommadnMessage] messageId: {messageId}");
-
-                // Try to inspect what the instance has
-                if (__instance != null && __instance.controller != null)
-                {
-                    MelonLogger.Msg($"[BattleUIManager] Has controller: {__instance.controller.GetType().FullName}");
-                }
-                else
-                {
-                    MelonLogger.Msg($"[BattleUIManager] Instance or controller is null");
-                }
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"Error in BattleUIManager.SetCommadnMessage patch: {ex.Message}");
-            }
-        }
-    }
 
     [HarmonyPatch(typeof(BattleUIManager), nameof(BattleUIManager.SetCommandText))]
     public static class BattleUIManager_SetCommandText_Patch
@@ -674,29 +622,12 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
-    [HarmonyPatch(typeof(BattleUIManager), nameof(BattleUIManager.SetSystemMessage))]
-    public static class BattleUIManager_SetSystemMessage_Patch
-    {
-        [HarmonyPostfix]
-        public static void Postfix(string messageId)
-        {
-            try
-            {
-                MelonLogger.Msg($"[BattleUIManager.SetSystemMessage] messageId: {messageId}");
-                // Don't announce yet - this is just the message ID
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"Error in BattleUIManager.SetSystemMessage patch: {ex.Message}");
-            }
-        }
-    }
 
     // Patch BattleTargetSelectController.SelectContent to announce player names during friendly targeting
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Player_Patch
     {
-        private static string lastPlayerName = "";
+        private static string lastPlayerInfo = "";
 
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData> list, int index)
@@ -724,15 +655,38 @@ namespace FFVI_ScreenReader.Patches
                         string characterName = selectedPlayer.ownedCharacterData.Name;
                         if (!string.IsNullOrEmpty(characterName))
                         {
+                            // Build announcement with HP and MP information
+                            string announcement = characterName;
+
+                            // Try to get HP and MP from BattleUnitDataInfo
+                            try
+                            {
+                                var unitDataInfo = selectedPlayer.BattleUnitDataInfo;
+                                if (unitDataInfo != null && unitDataInfo.Parameter != null)
+                                {
+                                    int currentHP = unitDataInfo.Parameter.CurrentHP;
+                                    int maxHP = unitDataInfo.Parameter.ConfirmedMaxHp();
+                                    int currentMP = unitDataInfo.Parameter.CurrentMP;
+                                    int maxMP = unitDataInfo.Parameter.ConfirmedMaxMp();
+
+                                    announcement += $", HP {currentHP}/{maxHP}, MP {currentMP}/{maxMP}";
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                MelonLogger.Warning($"Error reading HP/MP for {characterName}: {ex.Message}");
+                                // Continue with just the name if stats can't be read
+                            }
+
                             // Skip duplicates
-                            if (characterName == lastPlayerName)
+                            if (announcement == lastPlayerInfo)
                             {
                                 return;
                             }
-                            lastPlayerName = characterName;
+                            lastPlayerInfo = announcement;
 
-                            MelonLogger.Msg($"[Player Target] {characterName}");
-                            FFVI_ScreenReaderMod.SpeakText(characterName);
+                            MelonLogger.Msg($"[Player Target] {announcement}");
+                            FFVI_ScreenReaderMod.SpeakText(announcement);
                         }
                     }
                 }

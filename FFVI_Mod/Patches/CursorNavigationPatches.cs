@@ -39,6 +39,28 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
+                var parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("item_target_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("battle_target"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -80,6 +102,28 @@ namespace FFVI_ScreenReader.Patches
                 {
                     MelonLogger.Msg("GameCursor transform is null in PrevIndex patch");
                     return;
+                }
+
+                // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
+                var parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("item_target_select"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("battle_target"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
                 }
 
                 // Use managed coroutine system
