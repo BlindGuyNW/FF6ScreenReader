@@ -79,6 +79,12 @@ namespace FFVI_ScreenReader.Core
             {
                 AnnounceCurrentCharacterStatus();
             }
+
+            // Hotkey: G to announce current gil amount
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.G))
+            {
+                AnnounceGilAmount();
+            }
         }
 
         private void RescanEntities()
@@ -306,6 +312,31 @@ namespace FFVI_ScreenReader.Core
             {
                 LoggerInstance.Warning($"Error announcing character status: {ex.Message}");
                 SpeakText("Error reading character status");
+            }
+        }
+
+        private void AnnounceGilAmount()
+        {
+            try
+            {
+                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
+
+                if (userDataManager == null)
+                {
+                    SpeakText("User data not available");
+                    return;
+                }
+
+                int gil = userDataManager.OwendGil;
+                string gilMessage = $"{gil:N0} gil";
+
+                LoggerInstance.Msg($"[Gil Amount] {gilMessage}");
+                SpeakText(gilMessage);
+            }
+            catch (System.Exception ex)
+            {
+                LoggerInstance.Warning($"Error announcing gil amount: {ex.Message}");
+                SpeakText("Error reading gil amount");
             }
         }
 
