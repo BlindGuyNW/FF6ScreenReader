@@ -17,6 +17,66 @@ namespace FFVI_ScreenReader.Menus
     public static class ConfigMenuReader
     {
         /// <summary>
+        /// Find config value directly from a ConfigCommandController instance.
+        /// This is used by the controller-based patch system.
+        /// </summary>
+        public static string FindConfigValueFromController(ConfigCommandController_KeyInput controller)
+        {
+            try
+            {
+                if (controller == null || controller.view == null)
+                {
+                    return null;
+                }
+
+                var view = controller.view;
+
+                // Check slider value text
+                if (view.sliderValueText != null && !string.IsNullOrEmpty(view.sliderValueText.text?.Trim()))
+                {
+                    var value = view.sliderValueText.text.Trim();
+                    if (!IsPlaceholderText(value))
+                    {
+                        return value;
+                    }
+                }
+
+                // Check arrow change text
+                if (view.arrowChangeText != null && !string.IsNullOrEmpty(view.arrowChangeText.text?.Trim()))
+                {
+                    var value = view.arrowChangeText.text.Trim();
+                    if (!IsPlaceholderText(value))
+                    {
+                        return value;
+                    }
+                }
+
+                // Check dropdown
+                if (view.dropDown != null)
+                {
+                    var dropdownTexts = view.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
+                    foreach (var text in dropdownTexts)
+                    {
+                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        {
+                            var value = text.text.Trim();
+                            if (!IsPlaceholderText(value))
+                            {
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error reading config value from controller: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Find config menu value text (for sliders, dropdowns, etc.)
         /// Returns the current value of the config option at the cursor index.
         /// </summary>
@@ -112,13 +172,14 @@ namespace FFVI_ScreenReader.Menus
 
         /// <summary>
         /// Final filter to ensure placeholder text never gets through.
+        /// Case-insensitive check for common Unity placeholder values.
         /// </summary>
         private static bool IsPlaceholderText(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return true;
 
             string lower = text.ToLower().Trim();
-            return lower == "new text" || lower == "option a";
+            return lower == "new text" || lower == "option a" || lower == "text";
         }
 
         /// <summary>
@@ -237,7 +298,7 @@ namespace FFVI_ScreenReader.Menus
                         if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
                         {
                             var value = text.text.Trim();
-                            if (value != "new text")
+                            if (!IsPlaceholderText(value))
                             {
                                 return value;
                             }
@@ -254,7 +315,7 @@ namespace FFVI_ScreenReader.Menus
                         if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
                         {
                             var value = text.text.Trim();
-                            if (value != "new text")
+                            if (!IsPlaceholderText(value))
                             {
                                 return value;
                             }
@@ -324,10 +385,10 @@ namespace FFVI_ScreenReader.Menus
                     var dropdownTexts = view.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
                     foreach (var text in dropdownTexts)
                     {
-                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
+                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
                         {
                             var value = text.text.Trim();
-                            if (value != "new text")
+                            if (!IsPlaceholderText(value))
                             {
                                 return value;
                             }
@@ -385,7 +446,7 @@ namespace FFVI_ScreenReader.Menus
                         var dropdownTexts = configViewKeyInput.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
                         foreach (var text in dropdownTexts)
                         {
-                            if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
+                            if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
                             {
                                 var value = text.text.Trim();
                                 if (value != "new text")
@@ -422,7 +483,7 @@ namespace FFVI_ScreenReader.Menus
                     if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
                     {
                         var value = text.text.Trim();
-                        if (value != "new text") // Skip placeholder text
+                        if (!IsPlaceholderText(value)) // Skip placeholder text
                         {
                             MelonLogger.Msg($"Found slider value: '{value}'");
                             return value;
@@ -441,7 +502,7 @@ namespace FFVI_ScreenReader.Menus
                     if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
                     {
                         var value = text.text.Trim();
-                        if (value != "new text") // Skip placeholder text
+                        if (!IsPlaceholderText(value)) // Skip placeholder text
                         {
                             MelonLogger.Msg($"Found arrow value: '{value}'");
                             return value;
@@ -460,7 +521,7 @@ namespace FFVI_ScreenReader.Menus
                     if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
                     {
                         var value = text.text.Trim();
-                        if (value != "new text") // Skip placeholder text
+                        if (!IsPlaceholderText(value)) // Skip placeholder text
                         {
                             MelonLogger.Msg($"Found dropdown value: '{value}'");
                             return value;

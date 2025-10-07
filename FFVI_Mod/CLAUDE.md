@@ -4,58 +4,114 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a MelonLoader mod for Final Fantasy VI (Pixel Remaster) that provides screen reader accessibility support. The mod hooks into the game's cursor navigation system to announce menu items when players navigate with arrow keys.
+This is a MelonLoader mod for Final Fantasy VI (Pixel Remaster) that provides screen reader accessibility support. The mod hooks into the game's UI and battle systems to announce:
+- Menu navigation (cursor-based menus, config screens, battle commands)
+- Battle events (attacks, damage, status effects, experience/gil gains)
+- Field map entities (NPCs, treasure, exits) with pathfinding-based navigation
+- Character status (HP/MP during battles)
+
+The architecture has evolved from a monolithic FFVI_ScreenReader.cs to a modular structure with separate patches, readers, and utility classes.
 
 ## Architecture
 
-### Core Components
+### Code Organization
 
-**FFVI_ScreenReader.cs**: Main mod class (~950 lines) that inherits from `MelonMod`. Contains:
-- Tolk integration for screen reader support (load/unload lifecycle)
-- Harmony patches that hook game methods
-- Multi-strategy text discovery system for different menu types
-- Frame-delayed coroutine system with managed cleanup
-- Config value extraction for sliders, dropdowns, and arrow buttons
+The codebase is organized into the following directories:
 
-**Tolk.cs**: C# wrapper for the Tolk library (external DLL) that provides cross-platform screen reader integration. Uses P/Invoke to call native Tolk functions for speech output.
+**Core/**: Main mod entry point
+- `FFVI_ScreenReaderMod.cs`: Main mod class inheriting from `MelonMod`. Handles initialization, hotkeys, and entity cycling.
 
-### Text Discovery System
+**Patches/**: Harmony patches that intercept game methods
+- `CursorNavigationPatches.cs`: Patches `Cursor.NextIndex/PrevIndex` for fallback menu navigation
+- `TitleMenuPatches.cs`: Controller-based patches for title menu (`TitleMenuCommandController.SetCursor`)
+- `ConfigMenuPatches.cs`: Controller-based patches for config menus and keyboard/gamepad settings
+- `BattleMessagePatches.cs`: Announces battle actions and damage
+- `BattleResultPatches.cs`: Announces experience and gil gains after battles
+- `ItemTargetSelectionPatches.cs`: Announces target HP/MP during item selection
+- `FormationRowPatches.cs`: Announces formation row changes
 
-The mod implements multiple strategies for finding menu text, tried in sequence:
+**Menus/**: Text discovery and reading strategies for different menu types
+- `MenuTextDiscovery.cs`: Multi-strategy fallback system for finding menu text via hierarchy walking
+- `ConfigMenuReader.cs`: Reads config menu values (sliders, dropdowns, arrow buttons)
+- `TitleMenuReader.cs`: Provides friendly names for title menu commands
+- `KeyboardGamepadReader.cs`: Legacy keyboard/gamepad settings reader (now replaced by controller patches)
+- `CharacterSelectionReader.cs`: Reads character names and stats
+- `SaveSlotReader.cs`: Reads save slot information
 
-1. **Direct Text Search**: Walk up parent hierarchy from cursor position looking for `UnityEngine.UI.Text` components
-2. **ConfigCommandView Components**: Look for `ConfigCommandView.nameText` for config menus
-3. **Config Root Navigation**: Navigate to `config_root -> Content[cursor.Index]` for indexed menu items
-4. **In-Game Config Detection**: Handle `config_window_root` for in-game configuration menus
-5. **Keyboard/Gamepad Settings**: Navigate to `keys_settings_root -> [keyboard|gamepad]_setting_root -> Scroll View -> Content[cursor.Index]`
-6. **Fallback**: Use `GetComponentInChildren` as last resort
+**Field/**: Field map navigation and entity detection
+- `FieldNavigationHelper.cs`: Pathfinding and entity scanning for field map navigation
+- `MapNameResolver.cs`: Resolves map IDs to friendly names
 
-### Menu-Specific Implementations
+**Utils/**: Utility classes
+- `TolkWrapper.cs`: Wrapper for Tolk screen reader library
+- `CoroutineManager.cs`: Manages coroutine lifecycle to prevent memory leaks
+- `HierarchyDebug.cs`: Debugging utilities for dumping Unity hierarchy
 
-#### Config Menus (Title and In-Game)
-Config menus use `ConfigCommandController` with type-specific UI roots:
+**Tolk.cs**: P/Invoke declarations for native Tolk library functions
+
+### Menu Reading Architecture: Controller-Based vs Hierarchy Walking
+
+The mod uses two approaches for reading menu content:
+
+#### 1. Controller-Based Patches (Preferred)
+For menus where the game uses dedicated controller classes, patch the controller methods directly:
+- **Title Menu**: Patches `TitleMenuCommandController.SetCursor(int index)` to read from `controller.activeContents[index].Data.Name`
+- **Config Menus**: Patches `ConfigCommandController.SetFocus(bool isFocus)` to read from `controller.view.nameText` and config values
+- **Keyboard/Gamepad Settings**: Patches `ConfigKeysSettingController.SelectContent(int index, contentList)` to read action names and key bindings
+
+**Advantages:**
+- Direct access to controller's data models (already localized)
+- No hierarchy walking needed
+- More reliable and maintainable
+
+**How to add controller-based patches:**
+1. Find the controller class in decompiled source (`/home/zkline/ffpr/ff6/`)
+2. Identify the method called when cursor/selection changes (e.g., `SetCursor`, `SetFocus`, `SelectContent`)
+3. Create a Harmony postfix patch in `Patches/` directory
+4. Read from controller's data properties or view components
+5. Add skip logic to `CursorNavigationPatches.cs` to prevent fallback interference
+
+#### 2. Hierarchy Walking Fallback (Legacy)
+When no controller patch exists, `CursorNavigationPatches.cs` patches `Cursor.NextIndex/PrevIndex` and uses `MenuTextDiscovery.cs` strategies:
+1. **Direct Text Search**: Walk up parent hierarchy from cursor position
+2. **ConfigCommandView Components**: Look for `ConfigCommandView.nameText`
+3. **Config Root Navigation**: Navigate to `config_root -> Content[cursor.Index]`
+4. **Keyboard/Gamepad Settings**: Navigate to hierarchy paths
+5. **Fallback**: Use `GetComponentInChildren` as last resort
+
+**Note:** This is less reliable than controller patches and should be avoided for new menus.
+
+### Key Implementation Patterns
+
+#### Config Menu Value Reading
+Config menus use `ConfigCommandController` with type-specific UI roots that toggle based on option type:
 - `slider_type_root`: Contains slider values in `last_text` components
 - `arrowbutton_type_root`: Contains arrow button values in `last_text` components
 - `dropdown_type_root`: Contains dropdown values in `Label` components
+- Only ONE type root is `activeInHierarchy` at a time
 
-The mod reads both the option name AND the current value, announcing them as "Option Name: Value".
+#### Keyboard/Gamepad Settings
+- **Keyboard settings**: Read action name from `command.view.nameTexts` + key bindings from `command.keyboardIconController.view.iconTextList`
+- **Gamepad settings**: Only announce action name (button sprites aren't text-readable)
+- Both use the same controller class (`ConfigKeysSettingController`) but different icon controllers
 
-#### Keyboard/Gamepad Settings Menus
-Structure: `keys_settings_root -> config_keys_setting -> setting_window_root -> [keyboard_setting_root|gamepad_setting_root]`
+### Hotkeys
 
-The mod:
-1. Checks which root is active using `gameObject.activeSelf` (gamepad preferred if both exist)
-2. Navigates to `setting -> Scroll View -> Viewport -> Content[cursor.Index]`
-3. Collects ALL text components from the item (including inactive ones)
-4. Combines action name + bound key/button (e.g., "Confirm Enter", "Move Up W")
+The mod provides several hotkeys for field map navigation and battle info:
+- **Backslash (`\`)**: Announce current selected entity (NPC, treasure, exit)
+- **Right Bracket (`]`)**: Cycle to next entity
+- **Left Bracket (`[`)**: Cycle to previous entity
+- **Ctrl+Enter**: Auto-navigate to currently selected entity using pathfinding
+- **H**: Announce current character's HP/MP status in battle
+- **G**: Announce current gil amount
 
-### Coroutine Management System
+### Coroutine Management
 
-The mod implements a managed coroutine system to prevent memory leaks:
-- Tracks active coroutines in a list with thread-safe locking
-- Limits concurrent coroutines to 3, removing oldest when limit reached
+`CoroutineManager` prevents memory leaks from frame-delayed operations:
+- Tracks active coroutines with thread-safe locking
+- Limits concurrent coroutines to 3, removing oldest when limit exceeded
 - Cleans up all coroutines on mod unload
-- Each navigation event spawns a one-frame-delayed coroutine via `yield return null`
+- Used for one-frame delays (`yield return null`) to let Unity update before reading UI state
 
 ### Game Integration
 
@@ -126,48 +182,50 @@ When investigating menu reading issues:
 
 ## Important Implementation Details
 
-### Frame Timing
-The mod uses `yield return null` to delay cursor reading by one frame. This is critical because:
-- The game updates cursor position asynchronously
-- Reading immediately after `NextIndex`/`PrevIndex` gets stale positions
-- One-frame delay ensures cursor and UI have updated before reading
+### Frame Timing and Coroutines
+**Always use one-frame delay when reading UI after cursor movement:**
+```csharp
+CoroutineManager.StartManagedCoroutine(DelayedAnnouncement());
 
-### Hierarchy Walking vs Indexed Access
-The mod uses two approaches depending on menu type:
-- **Hierarchy Walking**: For menus where cursor moves within the transform hierarchy (e.g., title menu)
-- **Indexed Access**: For scroll views and config menus where cursor stays fixed but `cursor.Index` changes
+private static IEnumerator DelayedAnnouncement()
+{
+    yield return null;  // Wait one frame
+    // Now read UI state
+}
+```
 
-Both approaches are tried automatically - the mod doesn't need to know which menu type it's handling.
+**Why?**
+- Game updates cursor position asynchronously
+- Reading immediately gets stale positions
+- One-frame delay ensures cursor and UI have updated
 
-### Il2Cpp Interop
-The project uses Il2CppInterop for managed-to-native interop with the Unity il2cpp game. Key considerations:
-- Use `Il2CppSystem.Action<int>` instead of `System.Action<int>` for game method signatures
-- GameObject hierarchy navigation works the same as standard Unity
-- Text components use standard `UnityEngine.UI.Text` even in il2cpp builds
-- Some game classes are obfuscated (e.g., component types may show as generic "Component" without using `GetType().FullName`)
-- Include inactive objects when searching: `GetComponentsInChildren<T>(true)` to find disabled UI elements
+### Il2Cpp Interop Considerations
+- Use `Il2CppSystem.Action<int>` instead of `System.Action<int>` for game callbacks
+- Use `Il2CppSystem.Collections.Generic.List<T>` for game collection types
+- GameObject hierarchy navigation works same as standard Unity
+- Text components are `UnityEngine.UI.Text` even in il2cpp builds
+- Use `GetComponentsInChildren<T>(true)` to include inactive objects
+- For Il2CppReferenceArray, use index-based iteration: `for (int i = 0; i < array.Length; i++) { var item = array[i]; }`
 
-### Config Menu Value Reading
-Config menus have multiple UI type roots that are toggled based on the option type:
-- Only ONE type root is `activeInHierarchy` at a time
-- Check `gameObject.activeInHierarchy` before trying to read from a type root
-- Values are in `last_text` components for sliders/arrow buttons, `Label` for dropdowns
-- Skip placeholder text like "new text" or "Option A"
+### Localization Support
+**Never hardcode English strings** - always read from game's data models:
+- ✓ `contentView.Data.Name` - localized from game data
+- ✗ `GetFriendlyName(id)` - hardcoded English
 
-### Keyboard/Gamepad Settings
-Both settings types share the same UI structure but are toggled via `activeSelf`:
-- Check `gamepad_setting_root.gameObject.activeSelf` first, prefer gamepad if active
-- Fall back to `keyboard_setting_root.gameObject.activeSelf` if gamepad not active
-- Combine all text components found in the menu item (action name + bound keys)
-- Include inactive text components: `GetComponentsInChildren<UnityEngine.UI.Text>(true)`
+### Placeholder Text Detection
+Skip Unity placeholder text with case-insensitive check:
+```csharp
+string lower = text.ToLower().Trim();
+if (lower == "new text" || lower == "option a" || lower.StartsWith("menu_")) {
+    return true;  // Skip
+}
+```
 
 ### Safety and Null Checks
-The mod includes extensive null checking because:
-- Unity objects can be destroyed between frames
-- Coroutines may execute after scene changes
-- Il2Cpp objects can become invalid unexpectedly
-
-Always check `gameObject != null` before accessing properties, even after checking the transform exists.
+Il2Cpp objects can become invalid unexpectedly:
+- Unity objects destroyed between frames
+- Coroutines executing after scene changes
+- Always null-check before property access: `if (obj != null && obj.property != null)`
 
 ## Field Navigation and Pathfinding
 
