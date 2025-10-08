@@ -51,7 +51,7 @@ namespace FFVI_ScreenReader.Utils
                 if (tolk.IsLoaded() && !string.IsNullOrEmpty(text))
                 {
                     MelonLogger.Msg($"Speaking: {text}");
-                    tolk.Speak(text, false);
+                    tolk.Output(text, false);
                 }
             }
             catch (Exception ex)
