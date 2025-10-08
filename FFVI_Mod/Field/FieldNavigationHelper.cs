@@ -185,13 +185,23 @@ namespace FFVI_ScreenReader.Field
                     }
                 }
 
-                // Filter: Skip collision entities, PointIn, and visual/effect types
+                // Filter: Skip non-interactive types (visual/effect entities, area constraints, hazards)
                 if (info.ObjectType == Il2Cpp.MapConstants.ObjectType.PointIn ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.CollisionEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.AnimEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.EffectEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.ScreenEffect ||
-                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.TileAnimation)
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.TileAnimation ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.MoveArea ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.Polyline ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.ChangeOffset ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.IgnoreRoute ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.NonEncountArea ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.MapRange ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.ChangeAnimationKeyArea ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.DamageFloorGimmickArea ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.SlidingFloorGimmickArea ||
+                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.TimeSwitchingGimmickArea)
                     continue;
 
                 // Calculate distance after filtering
