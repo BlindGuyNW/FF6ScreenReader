@@ -117,6 +117,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is shop navigation (handled by ShopPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -232,6 +243,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is shop navigation (handled by ShopPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
                     {
                         return;
                     }
@@ -359,6 +381,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is shop navigation (handled by ShopPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -474,6 +507,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("equip_info_content") || parent.name.Contains("EquipmentInfo"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is shop navigation (handled by ShopPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
                     {
                         return;
                     }
