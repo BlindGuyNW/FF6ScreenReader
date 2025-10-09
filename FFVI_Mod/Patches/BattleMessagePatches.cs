@@ -737,15 +737,36 @@ namespace FFVI_ScreenReader.Patches
                                 string localizedName = messageManager.GetMessage(mesIdName);
                                 if (!string.IsNullOrEmpty(localizedName))
                                 {
+                                    // Build announcement with HP information
+                                    string announcement = localizedName;
+
+                                    // Try to get HP from BattleUnitDataInfo
+                                    try
+                                    {
+                                        var unitDataInfo = selectedEnemy.BattleUnitDataInfo;
+                                        if (unitDataInfo != null && unitDataInfo.Parameter != null)
+                                        {
+                                            int currentHP = unitDataInfo.Parameter.CurrentHP;
+                                            int maxHP = unitDataInfo.Parameter.ConfirmedMaxHp();
+
+                                            announcement += $", HP {currentHP}/{maxHP}";
+                                        }
+                                    }
+                                    catch (Exception hpEx)
+                                    {
+                                        MelonLogger.Warning($"Error reading HP for {localizedName}: {hpEx.Message}");
+                                        // Continue with just the name if HP can't be read
+                                    }
+
                                     // Skip duplicates
-                                    if (localizedName == lastEnemyName)
+                                    if (announcement == lastEnemyName)
                                     {
                                         return;
                                     }
-                                    lastEnemyName = localizedName;
+                                    lastEnemyName = announcement;
 
-                                    MelonLogger.Msg($"[Enemy Target] {localizedName}");
-                                    FFVI_ScreenReaderMod.SpeakText(localizedName);
+                                    MelonLogger.Msg($"[Enemy Target] {announcement}");
+                                    FFVI_ScreenReaderMod.SpeakText(announcement);
                                 }
                             }
                         }

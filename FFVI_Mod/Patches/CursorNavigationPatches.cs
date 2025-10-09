@@ -50,11 +50,30 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip ALL battle navigation (battle controller patches handle everything in battle)
+                var enemyEntities = UnityEngine.Object.FindObjectsOfType<Il2CppLast.Battle.BattleEnemyEntity>();
+                if (enemyEntities != null && enemyEntities.Length > 0)
+                {
+                    return; // We're in battle - let controller patches handle it
+                }
+
                 // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
                 {
-                    if (parent.name.Contains("battle_target"))
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("battle_target") || 
+                        parentName.Contains("battletarget") ||
+                        parentName.Contains("battle_command") ||
+                        parentName.Contains("battlecommand") ||
+                        parentName.Contains("battle_item") ||
+                        parentName.Contains("battleitem") ||
+                        parentName.Contains("battle_ability") ||
+                        parentName.Contains("battleability") ||
+                        parentName.Contains("battle_infomation") ||
+                        parentName.Contains("battleinfomation") ||
+                        parentName.Contains("battle_menu") ||
+                        parentName.Contains("battlemenu"))
                     {
                         return;
                     }
@@ -182,11 +201,30 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip ALL battle navigation (battle controller patches handle everything in battle)
+                var enemyEntities = UnityEngine.Object.FindObjectsOfType<Il2CppLast.Battle.BattleEnemyEntity>();
+                if (enemyEntities != null && enemyEntities.Length > 0)
+                {
+                    return; // We're in battle - let controller patches handle it
+                }
+
                 // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
                 {
-                    if (parent.name.Contains("battle_target"))
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("battle_target") || 
+                        parentName.Contains("battletarget") ||
+                        parentName.Contains("battle_command") ||
+                        parentName.Contains("battlecommand") ||
+                        parentName.Contains("battle_item") ||
+                        parentName.Contains("battleitem") ||
+                        parentName.Contains("battle_ability") ||
+                        parentName.Contains("battleability") ||
+                        parentName.Contains("battle_infomation") ||
+                        parentName.Contains("battleinfomation") ||
+                        parentName.Contains("battle_menu") ||
+                        parentName.Contains("battlemenu"))
                     {
                         return;
                     }
@@ -314,11 +352,30 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip ALL battle navigation (battle controller patches handle everything in battle)
+                var enemyEntities = UnityEngine.Object.FindObjectsOfType<Il2CppLast.Battle.BattleEnemyEntity>();
+                if (enemyEntities != null && enemyEntities.Length > 0)
+                {
+                    return; // We're in battle - let controller patches handle it
+                }
+
                 // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
                 {
-                    if (parent.name.Contains("battle_target"))
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("battle_target") || 
+                        parentName.Contains("battletarget") ||
+                        parentName.Contains("battle_command") ||
+                        parentName.Contains("battlecommand") ||
+                        parentName.Contains("battle_item") ||
+                        parentName.Contains("battleitem") ||
+                        parentName.Contains("battle_ability") ||
+                        parentName.Contains("battleability") ||
+                        parentName.Contains("battle_infomation") ||
+                        parentName.Contains("battleinfomation") ||
+                        parentName.Contains("battle_menu") ||
+                        parentName.Contains("battlemenu"))
                     {
                         return;
                     }
@@ -446,11 +503,30 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip ALL battle navigation (battle controller patches handle everything in battle)
+                var enemyEntities = UnityEngine.Object.FindObjectsOfType<Il2CppLast.Battle.BattleEnemyEntity>();
+                if (enemyEntities != null && enemyEntities.Length > 0)
+                {
+                    return; // We're in battle - let controller patches handle it
+                }
+
                 // Skip if this is battle target selection (handled by BattleTargetSelectController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
                 {
-                    if (parent.name.Contains("battle_target"))
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("battle_target") || 
+                        parentName.Contains("battletarget") ||
+                        parentName.Contains("battle_command") ||
+                        parentName.Contains("battlecommand") ||
+                        parentName.Contains("battle_item") ||
+                        parentName.Contains("battleitem") ||
+                        parentName.Contains("battle_ability") ||
+                        parentName.Contains("battleability") ||
+                        parentName.Contains("battle_infomation") ||
+                        parentName.Contains("battleinfomation") ||
+                        parentName.Contains("battle_menu") ||
+                        parentName.Contains("battlemenu"))
                     {
                         return;
                     }

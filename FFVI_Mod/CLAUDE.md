@@ -25,6 +25,7 @@ The codebase is organized into the following directories:
 - `CursorNavigationPatches.cs`: Patches `Cursor.NextIndex/PrevIndex` for fallback menu navigation
 - `TitleMenuPatches.cs`: Controller-based patches for title menu (`TitleMenuCommandController.SetCursor`)
 - `ConfigMenuPatches.cs`: Controller-based patches for config menus and keyboard/gamepad settings
+- `BattleCommandPatches.cs`: Controller-based patches for battle command menu, item/tool selection, and abilities
 - `BattleMessagePatches.cs`: Announces battle actions and damage
 - `BattleResultPatches.cs`: Announces experience and gil gains after battles
 - `ItemTargetSelectionPatches.cs`: Announces target HP/MP during item selection
@@ -70,6 +71,34 @@ For menus where the game uses dedicated controller classes, patch the controller
 3. Create a Harmony postfix patch in `Patches/` directory
 4. Read from controller's data properties or view components
 5. Add skip logic to `CursorNavigationPatches.cs` to prevent fallback interference
+
+#### Battle Command Menus (Controller-Based)
+Battle menus use controller patches in `BattleCommandPatches.cs`:
+
+**Battle Command Selection (Attack, Magic, Item, Tools, etc.):**
+- Patches `BattleCommandSelectController.SetCursor(int index)`
+- Reads from `controller.contentList[index].TargetCommand.MesIdName`
+- Uses `MessageManager.Instance.GetMessage()` for localization
+
+**Item and Tool Selection:**
+- Patches `BattleItemInfomationController.SelectContent(Cursor, WithinRangeType)`
+- **CRITICAL**: This controller is reused for both Items AND Tools menus
+- Use `controller.isMachineState` boolean flag to distinguish:
+  - `isMachineState = true` → Tools menu, use `machineContentList`
+  - `isMachineState = false` → Items menu, use `contentList`
+- Items: Read from `contentList[index].Data.Name` (ItemListContentData)
+- Tools: Read from `machineContentList[index].view.IconTextView.nameText.text`
+- **DO NOT** use `selectedCommand.Id`, `selectedAbility`, or `activeInHierarchy` - use `isMachineState`
+
+**Ability/Magic Selection:**
+- Patches `BattleQuantityAbilityInfomationController.SelectContent(Cursor, WithinRangeType)`
+- Reads from `controller.contentList[index].Data` (OwnedAbility)
+- Uses `abilityData.MesIdName` and `MessageManager` for localization
+
+**Special Abilities (Blitz, Tools submenu, etc.):**
+- Patches `SpecialAbilityContentListController.SetCursor(Cursor)`
+- Reads from `controller.contentList[index].Data` (OwnedAbility)
+- Uses `MessageManager` for localization
 
 #### 2. Hierarchy Walking Fallback (Legacy)
 When no controller patch exists, `CursorNavigationPatches.cs` patches `Cursor.NextIndex/PrevIndex` and uses `MenuTextDiscovery.cs` strategies:
