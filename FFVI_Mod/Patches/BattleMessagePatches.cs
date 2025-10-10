@@ -638,6 +638,9 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Player_Patch
     {
+        private static int lastAnnouncedIndex = -1;
+        private static string lastAnnouncement = "";
+
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData> list, int index)
         {
@@ -687,6 +690,14 @@ namespace FFVI_ScreenReader.Patches
                                 // Continue with just the name if stats can't be read
                             }
 
+                            // Skip duplicate announcements (same index AND same announcement)
+                            if (index == lastAnnouncedIndex && announcement == lastAnnouncement)
+                            {
+                                return;
+                            }
+                            lastAnnouncedIndex = index;
+                            lastAnnouncement = announcement;
+
                             MelonLogger.Msg($"[Player Target] {announcement}");
                             FFVI_ScreenReaderMod.SpeakText(announcement);
                         }
@@ -704,6 +715,9 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Enemy_Patch
     {
+        private static int lastAnnouncedIndex = -1;
+        private static string lastAnnouncement = "";
+
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData> list, int index)
         {
@@ -757,6 +771,14 @@ namespace FFVI_ScreenReader.Patches
                                         MelonLogger.Warning($"Error reading HP for {localizedName}: {hpEx.Message}");
                                         // Continue with just the name if HP can't be read
                                     }
+
+                                    // Skip duplicate announcements (same index AND same announcement)
+                                    if (index == lastAnnouncedIndex && announcement == lastAnnouncement)
+                                    {
+                                        return;
+                                    }
+                                    lastAnnouncedIndex = index;
+                                    lastAnnouncement = announcement;
 
                                     MelonLogger.Msg($"[Enemy Target] {announcement}");
                                     FFVI_ScreenReaderMod.SpeakText(announcement);
