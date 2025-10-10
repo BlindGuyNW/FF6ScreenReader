@@ -34,7 +34,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                string cleanSpeaker = value.Trim();
+                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
+                string cleanSpeaker = string.Copy(value.Trim());
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -70,7 +71,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                string cleanSpeaker = speakerName.Trim();
+                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
+                string cleanSpeaker = string.Copy(speakerName.Trim());
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -89,7 +91,8 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
-    // Battle speaker announcements (Touch controls)
+    // Battle speaker announcements (Touch controls) - DISABLED: Not needed for keyboard/controller
+    /*
     [HarmonyPatch(typeof(BattleCommandMessageController_Touch), nameof(BattleCommandMessageController_Touch.SetSpeaker))]
     public static class BattleCommandMessageController_Touch_SetSpeaker_Patch
     {
@@ -106,7 +109,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                string cleanSpeaker = speakerName.Trim();
+                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
+                string cleanSpeaker = string.Copy(speakerName.Trim());
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -124,6 +128,7 @@ namespace FFVI_ScreenReader.Patches
             }
         }
     }
+    */
 
     [HarmonyPatch(typeof(MessageWindowView), nameof(MessageWindowView.SetMessage))]
     public static class MessageWindowView_SetMessage_Patch
@@ -145,7 +150,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                string cleanMessage = message.Trim();
+                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
+                string cleanMessage = string.Copy(message.Trim());
 
                 // Skip exact duplicates
                 if (cleanMessage == lastMessage)
@@ -157,7 +163,7 @@ namespace FFVI_ScreenReader.Patches
                 if (!string.IsNullOrWhiteSpace(lastMessage) && cleanMessage.StartsWith(lastMessage))
                 {
                     // Only announce the new text that was added
-                    string newText = cleanMessage.Substring(lastMessage.Length).Trim();
+                    string newText = string.Copy(cleanMessage.Substring(lastMessage.Length).Trim());
                     if (!string.IsNullOrWhiteSpace(newText))
                     {
                         MelonLogger.Msg($"[MessageWindowView.SetMessage - New] {newText}");
@@ -492,13 +498,15 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                string cleanMessage = message.Trim();
+                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
+                string cleanMessage = string.Copy(message.Trim());
 
                 // Skip duplicates
                 if (cleanMessage == lastMessage)
                 {
                     return;
                 }
+
                 lastMessage = cleanMessage;
 
                 MelonLogger.Msg($"[Battle Command] {cleanMessage}");
@@ -553,6 +561,8 @@ namespace FFVI_ScreenReader.Patches
     }
 
 
+    // DISABLED - Touch controls not needed for keyboard/controller
+    /*
     [HarmonyPatch(typeof(Il2CppLast.UI.Touch.BattleCommandMessageController), nameof(Il2CppLast.UI.Touch.BattleCommandMessageController.SetSystemMessage))]
     public static class BattleCommandMessageController_SetSystemMessage_Patch
     {
@@ -586,6 +596,7 @@ namespace FFVI_ScreenReader.Patches
             }
         }
     }
+    */
 
 
     [HarmonyPatch(typeof(BattleUIManager), nameof(BattleUIManager.SetCommandText))]
@@ -627,8 +638,6 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Player_Patch
     {
-        private static string lastPlayerInfo = "";
-
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData> list, int index)
         {
@@ -678,13 +687,6 @@ namespace FFVI_ScreenReader.Patches
                                 // Continue with just the name if stats can't be read
                             }
 
-                            // Skip duplicates
-                            if (announcement == lastPlayerInfo)
-                            {
-                                return;
-                            }
-                            lastPlayerInfo = announcement;
-
                             MelonLogger.Msg($"[Player Target] {announcement}");
                             FFVI_ScreenReaderMod.SpeakText(announcement);
                         }
@@ -702,8 +704,6 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Enemy_Patch
     {
-        private static string lastEnemyName = "";
-
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData> list, int index)
         {
@@ -757,13 +757,6 @@ namespace FFVI_ScreenReader.Patches
                                         MelonLogger.Warning($"Error reading HP for {localizedName}: {hpEx.Message}");
                                         // Continue with just the name if HP can't be read
                                     }
-
-                                    // Skip duplicates
-                                    if (announcement == lastEnemyName)
-                                    {
-                                        return;
-                                    }
-                                    lastEnemyName = announcement;
 
                                     MelonLogger.Msg($"[Enemy Target] {announcement}");
                                     FFVI_ScreenReaderMod.SpeakText(announcement);
