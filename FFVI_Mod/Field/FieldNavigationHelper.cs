@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Il2Cpp;
 using Il2CppLast.Entity.Field;
@@ -128,6 +129,7 @@ namespace FFVI_ScreenReader.Field
                 if (treasure != null)
                 {
                     info.IsTreasure = true;
+                    info.IsOpenedTreasure = treasure.isOpen;
                 }
 
                 results.Add(info);
@@ -225,6 +227,7 @@ namespace FFVI_ScreenReader.Field
                 if (treasure != null)
                 {
                     info.IsTreasure = true;
+                    info.IsOpenedTreasure = treasure.isOpen;
                 }
 
                 results.Add(info);
@@ -232,6 +235,9 @@ namespace FFVI_ScreenReader.Field
 
             // De-duplicate entities at the same position
             results = DeduplicateByPosition(results);
+
+            // Filter out doors/triggers that are immediately before map exits
+            results = FilterDoorBeforeMapExit(results, playerPos);
 
             // Sort by distance
             results.Sort((a, b) => a.Distance.CompareTo(b.Distance));
@@ -301,6 +307,62 @@ namespace FFVI_ScreenReader.Field
                 case Il2Cpp.MapConstants.ObjectType.RandomEvent: return 10;
                 default: return 100;
             }
+        }
+
+        /// <summary>
+        /// Filters out OpenTrigger (door/trigger) entities that are immediately before a GotoMap (map exit)
+        /// in the same direction. This reduces disorientation from announcing redundant entities.
+        /// </summary>
+        private static List<EntityInfo> FilterDoorBeforeMapExit(List<EntityInfo> entities, Vector3 playerPos)
+        {
+            var toRemove = new System.Collections.Generic.HashSet<EntityInfo>();
+
+            // Find all GotoMap entities
+            var mapExits = entities.Where(e => e.ObjectType == Il2Cpp.MapConstants.ObjectType.GotoMap).ToList();
+
+            foreach (var mapExit in mapExits)
+            {
+                // Calculate direction from player to map exit
+                Vector3 exitDir = (mapExit.Position - playerPos).normalized;
+                float exitAngle = Mathf.Atan2(exitDir.x, exitDir.y) * Mathf.Rad2Deg;
+                if (exitAngle < 0) exitAngle += 360;
+
+                // Find OpenTrigger entities that might be before this exit
+                var doors = entities.Where(e =>
+                    e.ObjectType == Il2Cpp.MapConstants.ObjectType.OpenTrigger &&
+                    e.Distance < mapExit.Distance  // Door must be closer than the exit
+                ).ToList();
+
+                foreach (var door in doors)
+                {
+                    // Calculate direction from player to door
+                    Vector3 doorDir = (door.Position - playerPos).normalized;
+                    float doorAngle = Mathf.Atan2(doorDir.x, doorDir.y) * Mathf.Rad2Deg;
+                    if (doorAngle < 0) doorAngle += 360;
+
+                    // Calculate angular difference (handle wraparound at 0/360)
+                    float angleDiff = Mathf.Abs(exitAngle - doorAngle);
+                    if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+                    // Check if door and exit are:
+                    // 1. In roughly the same direction (within 30 degrees)
+                    // 2. Close together (within 40 units)
+                    const float ANGLE_TOLERANCE = 30f;
+                    const float DISTANCE_TOLERANCE = 40f;
+
+                    float distanceBetween = Vector3.Distance(door.Position, mapExit.Position);
+
+                    if (angleDiff <= ANGLE_TOLERANCE && distanceBetween <= DISTANCE_TOLERANCE)
+                    {
+                        // This door is immediately before the map exit - remove it
+                        toRemove.Add(door);
+                        MelonLoader.MelonLogger.Msg($"[Navigation] Filtering out door/trigger before map exit: {door.Name} (angle diff: {angleDiff:F1}°, distance: {distanceBetween:F1} units)");
+                    }
+                }
+            }
+
+            // Return filtered list
+            return entities.Where(e => !toRemove.Contains(e)).ToList();
         }
 
         /// <summary>
@@ -601,7 +663,7 @@ namespace FFVI_ScreenReader.Field
         private static string GetEntityTypeDescription(EntityInfo info)
         {
             if (info.IsNPC) return "NPC";
-            if (info.IsTreasure) return "Treasure Chest";
+            if (info.IsTreasure) return info.IsOpenedTreasure ? "Opened Treasure Chest" : "Treasure Chest";
 
             // Use ObjectType enum if available - prioritize important types
             if (info.ObjectType != Il2Cpp.MapConstants.ObjectType.PointIn)
@@ -641,6 +703,7 @@ namespace FFVI_ScreenReader.Field
         public Il2Cpp.MapConstants.ObjectType ObjectType { get; set; }
         public bool IsNPC { get; set; }
         public bool IsTreasure { get; set; }
+        public bool IsOpenedTreasure { get; set; }
     }
 
     public class PathInfo
