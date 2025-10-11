@@ -123,6 +123,57 @@ namespace FFVI_ScreenReader.Field
                 if (npc != null)
                 {
                     info.IsNPC = true;
+
+                    // Try to get additional NPC information from PropertyNpc
+                    var npcProperty = fieldEntity.Property?.TryCast<Il2CppLast.Map.PropertyNpc>();
+                    if (npcProperty != null)
+                    {
+                        // Store additional NPC metadata
+                        var additionalInfo = new System.Collections.Generic.List<string>();
+
+                        // Add asset name - check if it's a playable character first
+                        if (!string.IsNullOrEmpty(npcProperty.AssetName) && npcProperty.AssetName != info.Name)
+                        {
+                            string characterName = GetCharacterNameFromAssetName(npcProperty.AssetName);
+                            if (characterName != null)
+                            {
+                                additionalInfo.Add(characterName);
+                            }
+                            else
+                            {
+                                additionalInfo.Add(npcProperty.AssetName);
+                            }
+                        }
+
+                        // Add movement type
+                        var moveType = npcProperty.MoveType;
+                        if (moveType == Il2Cpp.FieldEntityConstants.MoveType.None)
+                        {
+                            additionalInfo.Add("stationary");
+                        }
+                        else if (moveType == Il2Cpp.FieldEntityConstants.MoveType.Stamp)
+                        {
+                            additionalInfo.Add("wandering");
+                        }
+                        else if (moveType == Il2Cpp.FieldEntityConstants.MoveType.Area ||
+                                 moveType == Il2Cpp.FieldEntityConstants.MoveType.Route)
+                        {
+                            additionalInfo.Add("patrolling");
+                        }
+
+                        // Check if it's a shop (ProductGroupId > 0)
+                        var productGroupId = npcProperty.ProductGroupId;
+                        if (productGroupId > 0)
+                        {
+                            additionalInfo.Add("shop");
+                        }
+
+                        // Append additional info to the name if we found anything
+                        if (additionalInfo.Count > 0)
+                        {
+                            info.Name = $"{info.Name} ({string.Join(", ", additionalInfo)})";
+                        }
+                    }
                 }
 
                 var treasure = entity.TryCast<Il2CppLast.Entity.Field.FieldTresureBox>();
@@ -221,6 +272,57 @@ namespace FFVI_ScreenReader.Field
                 if (npc != null)
                 {
                     info.IsNPC = true;
+
+                    // Try to get additional NPC information from PropertyNpc
+                    var npcProperty = entity.Property?.TryCast<Il2CppLast.Map.PropertyNpc>();
+                    if (npcProperty != null)
+                    {
+                        // Store additional NPC metadata
+                        var additionalInfo = new System.Collections.Generic.List<string>();
+
+                        // Add asset name - check if it's a playable character first
+                        if (!string.IsNullOrEmpty(npcProperty.AssetName) && npcProperty.AssetName != info.Name)
+                        {
+                            string characterName = GetCharacterNameFromAssetName(npcProperty.AssetName);
+                            if (characterName != null)
+                            {
+                                additionalInfo.Add(characterName);
+                            }
+                            else
+                            {
+                                additionalInfo.Add(npcProperty.AssetName);
+                            }
+                        }
+
+                        // Add movement type
+                        var moveType = npcProperty.MoveType;
+                        if (moveType == Il2Cpp.FieldEntityConstants.MoveType.None)
+                        {
+                            additionalInfo.Add("stationary");
+                        }
+                        else if (moveType == Il2Cpp.FieldEntityConstants.MoveType.Stamp)
+                        {
+                            additionalInfo.Add("wandering");
+                        }
+                        else if (moveType == Il2Cpp.FieldEntityConstants.MoveType.Area ||
+                                 moveType == Il2Cpp.FieldEntityConstants.MoveType.Route)
+                        {
+                            additionalInfo.Add("patrolling");
+                        }
+
+                        // Check if it's a shop (ProductGroupId > 0)
+                        var productGroupId = npcProperty.ProductGroupId;
+                        if (productGroupId > 0)
+                        {
+                            additionalInfo.Add("shop");
+                        }
+
+                        // Append additional info to the name if we found anything
+                        if (additionalInfo.Count > 0)
+                        {
+                            info.Name = $"{info.Name} ({string.Join(", ", additionalInfo)})";
+                        }
+                    }
                 }
 
                 var treasure = entity.TryCast<FieldTresureBox>();
@@ -603,6 +705,78 @@ namespace FFVI_ScreenReader.Field
             else result = "Unknown";
 
             return result;
+        }
+
+        /// <summary>
+        /// Gets friendly character name from asset name
+        /// First checks P-codes (playable characters like P002 -> Locke)
+        /// Then queries game's NPC master data for non-playable characters
+        /// </summary>
+        private static string GetCharacterNameFromAssetName(string assetName)
+        {
+            if (string.IsNullOrEmpty(assetName))
+                return null;
+
+            // First check P-codes for playable characters (hardcoded for reliability)
+            var characterMap = new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "P001", "Terra" },
+                { "P002", "Locke" },
+                { "P003", "Cyan" },
+                { "P004", "Shadow" },
+                { "P005", "Edgar" },
+                { "P006", "Sabin" },
+                { "P007", "Celes" },
+                { "P008", "Strago" },
+                { "P009", "Relm" },
+                { "P010", "Setzer" },
+                { "P011", "Mog" },
+                { "P012", "Gau" },
+                { "P013", "Gogo" },
+                { "P014", "Umaro" }
+            };
+
+            // Check if the asset name contains a P-code (handles "P002", "MO_FF6_P002", etc.)
+            foreach (var kvp in characterMap)
+            {
+                if (assetName.Contains(kvp.Key))
+                {
+                    return kvp.Value;
+                }
+            }
+
+            // If not a playable character, query NPC master data
+            try
+            {
+                var npcTemplateList = Il2CppLast.Data.Master.Npc.templateList;
+                if (npcTemplateList != null && npcTemplateList.Count > 0)
+                {
+                    // Iterate through the master data to find matching asset name
+                    foreach (var kvp in npcTemplateList)
+                    {
+                        if (kvp.Value == null) continue;
+
+                        var npcData = kvp.Value.TryCast<Il2CppLast.Data.Master.Npc>();
+                        if (npcData != null &&
+                            !string.IsNullOrEmpty(npcData.AssetName) &&
+                            npcData.AssetName == assetName)
+                        {
+                            // Found a match! Return the friendly NPC name
+                            if (!string.IsNullOrEmpty(npcData.NpcName))
+                            {
+                                return npcData.NpcName;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (System.Exception)
+            {
+                // If master data isn't available yet or lookup fails, silently return null
+                // This can happen during initialization or scene transitions
+            }
+
+            return null;
         }
 
         /// <summary>
