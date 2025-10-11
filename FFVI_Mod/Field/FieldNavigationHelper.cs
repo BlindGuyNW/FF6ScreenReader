@@ -356,7 +356,6 @@ namespace FFVI_ScreenReader.Field
                     {
                         // This door is immediately before the map exit - remove it
                         toRemove.Add(door);
-                        MelonLoader.MelonLogger.Msg($"[Navigation] Filtering out door/trigger before map exit: {door.Name} (angle diff: {angleDiff:F1}°, distance: {distanceBetween:F1} units)");
                     }
                 }
             }
@@ -403,15 +402,7 @@ namespace FFVI_ScreenReader.Field
                 {
                     float layerZ = player.gameObject.layer - 9;
                     startCell.z = layerZ;
-
-                    MelonLoader.MelonLogger.Msg($"[Path] Player layer: {player.gameObject.layer}, Z: {layerZ}");
                 }
-
-                // DEBUG: Condensed coordinate logging
-                Vector3 worldDiff = targetWorldPos - playerWorldPos;
-                MelonLoader.MelonLogger.Msg($"[Path] Player→Target: World Δ({worldDiff.x:F0}, {worldDiff.y:F0}) Cell ({startCell.x:F0},{startCell.y:F0},{startCell.z:F0})→({destCell.x:F0},{destCell.y:F0},{destCell.z:F0})");
-
-                pathInfo.ErrorMessage = $"Debug: Start cell ({startCell.x:F1},{startCell.y:F1},{startCell.z:F1}) to dest ({destCell.x:F1},{destCell.y:F1},{destCell.z:F1})";
 
                 // Use the REAL pathfinding method with player's collision state!
                 Il2CppSystem.Collections.Generic.List<Vector3> pathPoints = null;
@@ -419,7 +410,6 @@ namespace FFVI_ScreenReader.Field
                 if (player != null)
                 {
                     bool playerCollisionState = player._IsOnCollision_k__BackingField;
-                    MelonLoader.MelonLogger.Msg($"[Path] player._IsOnCollision_k__BackingField = {playerCollisionState}");
 
                     // Touch controller searches layers 2,1,0 when collision enabled to find walkable layer
                     // Try pathfinding with different destination layers until one succeeds
@@ -430,7 +420,6 @@ namespace FFVI_ScreenReader.Field
 
                         if (pathPoints != null && pathPoints.Count > 0)
                         {
-                            MelonLoader.MelonLogger.Msg($"[Path] SUCCESS: startZ={startCell.z}, destZ={destCell.z}, collision={playerCollisionState}");
                             break;
                         }
                     }
@@ -438,8 +427,6 @@ namespace FFVI_ScreenReader.Field
                     // If direct path failed, try adjacent tiles
                     if (pathPoints == null || pathPoints.Count == 0)
                     {
-                        MelonLoader.MelonLogger.Msg("[Path] Direct path failed, trying adjacent tiles...");
-
                         // Try adjacent tiles (one cell = 16 units in world space)
                         // Try all 8 directions: cardinals first, then diagonals
                         Vector3[] adjacentOffsets = new Vector3[] {
@@ -472,7 +459,6 @@ namespace FFVI_ScreenReader.Field
 
                                 if (pathPoints != null && pathPoints.Count > 0)
                                 {
-                                    MelonLoader.MelonLogger.Msg($"[Path] SUCCESS with adjacent tile (offset {offset}): startZ={startCell.z}, destZ={adjacentDestCell.z}");
                                     break;
                                 }
                             }
@@ -488,19 +474,11 @@ namespace FFVI_ScreenReader.Field
                 }
                 else
                 {
-                    MelonLoader.MelonLogger.Msg("[Path] No player entity, falling back to SearchSimple");
                     pathPoints = Il2Cpp.MapRouteSearcher.SearchSimple(mapHandle, startCell, destCell);
                 }
 
-                if (pathPoints == null)
+                if (pathPoints == null || pathPoints.Count == 0)
                 {
-                    pathInfo.ErrorMessage += " - Direct and adjacent paths returned null";
-                    return pathInfo;
-                }
-
-                if (pathPoints.Count == 0)
-                {
-                    pathInfo.ErrorMessage += " - Direct and adjacent paths returned empty";
                     return pathInfo;
                 }
 
@@ -534,9 +512,6 @@ namespace FFVI_ScreenReader.Field
         {
             if (worldPath == null || worldPath.Count < 2)
                 return "No movement needed";
-
-            // DEBUG: Log path summary
-            MelonLoader.MelonLogger.Msg($"[Path] {worldPath.Count} waypoints from ({worldPath[0].x:F0},{worldPath[0].y:F0}) to ({worldPath[worldPath.Count-1].x:F0},{worldPath[worldPath.Count-1].y:F0})");
 
             var segments = new List<string>();
             Vector3 currentDir = Vector3.zero;

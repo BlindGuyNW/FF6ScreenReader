@@ -27,7 +27,6 @@ namespace FFVI_ScreenReader.Core
         public override void OnInitializeMelon()
         {
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
-            LoggerInstance.Msg("*** COROUTINE CLEANUP SYSTEM ENABLED - TESTING MANAGED COROUTINES ***");
 
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
@@ -67,11 +66,11 @@ namespace FFVI_ScreenReader.Core
                 CyclePrevious();
             }
 
-            // Hotkey: Ctrl+Enter to auto-navigate to currently selected entity
+            // Hotkey: Ctrl+Enter to teleport to currently selected entity
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) &&
                 (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl)))
             {
-                AutoNavigateToCurrentEntity();
+                TeleportToCurrentEntity();
             }
 
             // Hotkey: H to announce current character's health/status in battle
@@ -196,7 +195,7 @@ namespace FFVI_ScreenReader.Core
             AnnounceCurrentEntity();
         }
 
-        private void AutoNavigateToCurrentEntity()
+        private void TeleportToCurrentEntity()
         {
             if (cachedEntities.Count == 0 || currentEntityIndex < 0 || currentEntityIndex >= cachedEntities.Count)
             {
@@ -213,21 +212,18 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
-            // Simply walk to the cached entity position
             var player = playerController.fieldPlayer;
 
-            // Call MoveTo with explicit null values for Il2Cpp nullable parameters
-            player.MoveTo(
-                entityInfo.Position,
-                speedId: new Il2CppSystem.Nullable<Il2Cpp.FieldEntityConstants.FieldSpriteSpeedID>(),
-                animName: null,
-                keepMovingIfStop: false,
-                inputAxis: new Il2CppSystem.Nullable<UnityEngine.Vector2>(),
-                duration: 0f
-            );
+            // Calculate offset position slightly south of the target to avoid overlapping
+            // One cell = 16 units, so moving 16 units south (negative Y)
+            Vector3 targetPos = entityInfo.Position;
+            Vector3 offsetPos = new Vector3(targetPos.x, targetPos.y - 16f, targetPos.z);
 
-            SpeakText($"Walking to {entityInfo.Name}");
-            LoggerInstance.Msg($"Auto-navigating to {entityInfo.Name} at {entityInfo.Position}");
+            // Instantly teleport by setting localPosition directly
+            player.transform.localPosition = offsetPos;
+
+            SpeakText($"Teleported south of {entityInfo.Name}");
+            LoggerInstance.Msg($"Teleported to position south of {entityInfo.Name} at {offsetPos}");
         }
 
         private void AnnounceCurrentCharacterStatus()
@@ -305,7 +301,6 @@ namespace FFVI_ScreenReader.Core
                 }
 
                 string statusMessage = string.Join(", ", statusParts);
-                LoggerInstance.Msg($"[Character Status] {statusMessage}");
                 SpeakText(statusMessage);
             }
             catch (System.Exception ex)
@@ -330,7 +325,6 @@ namespace FFVI_ScreenReader.Core
                 int gil = userDataManager.OwendGil;
                 string gilMessage = $"{gil:N0} gil";
 
-                LoggerInstance.Msg($"[Gil Amount] {gilMessage}");
                 SpeakText(gilMessage);
             }
             catch (System.Exception ex)
