@@ -158,11 +158,12 @@ namespace FFVI_ScreenReader.Core
             string announcement;
             if (pathInfo.Success)
             {
-                announcement = $"{currentEntityIndex + 1} of {cachedEntities.Count}: {formatted}, {pathInfo.Description}, {pathInfo.StepCount} steps";
+                // Just announce the path - user knows what entity they're navigating to from cycling
+                announcement = $"{pathInfo.Description}";
             }
             else
             {
-                announcement = $"{currentEntityIndex + 1} of {cachedEntities.Count}: {formatted}, no path";
+                announcement = "no path";
             }
 
             SpeakText(announcement);
@@ -177,7 +178,7 @@ namespace FFVI_ScreenReader.Core
             }
 
             currentEntityIndex = (currentEntityIndex + 1) % cachedEntities.Count;
-            AnnounceCurrentEntity();
+            AnnounceEntityOnly();
         }
 
         private void CyclePrevious()
@@ -192,7 +193,44 @@ namespace FFVI_ScreenReader.Core
             if (currentEntityIndex < 0)
                 currentEntityIndex = cachedEntities.Count - 1;
 
-            AnnounceCurrentEntity();
+            AnnounceEntityOnly();
+        }
+
+        private void AnnounceEntityOnly()
+        {
+            if (cachedEntities.Count == 0)
+            {
+                SpeakText("No entities nearby");
+                return;
+            }
+
+            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
+            if (playerController?.fieldPlayer == null)
+            {
+                SpeakText("Not in field");
+                return;
+            }
+
+            var entityInfo = cachedEntities[currentEntityIndex];
+            // CRITICAL: Touch controller uses localPosition, NOT position!
+            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
+            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
+
+            // Pass current player position to get fresh direction/distance (use world position for display)
+            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerController.fieldPlayer.transform.position);
+
+            // Check if path exists
+            var pathInfo = Field.FieldNavigationHelper.FindPathTo(
+                playerPos,
+                targetPos,
+                playerController.mapHandle,
+                playerController.fieldPlayer
+            );
+
+            // Announce entity info + path status + count at the end
+            string countSuffix = $", {currentEntityIndex + 1} of {cachedEntities.Count}";
+            string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}, no path{countSuffix}";
+            SpeakText(announcement);
         }
 
         private void TeleportToCurrentEntity()
