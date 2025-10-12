@@ -7,6 +7,8 @@ using Il2CppLast.UI;
 using Il2CppLast.UI.Touch;
 using Il2CppLast.UI.KeyInput;
 using Il2CppLast.UI.Message;
+using Il2CppLast.Battle;
+using Il2CppLast.Data.Master;
 using FFVI_ScreenReader.Core;
 using UnityEngine;
 using BattleCommandMessageController_KeyInput = Il2CppLast.UI.KeyInput.BattleCommandMessageController;
@@ -478,6 +480,110 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in CreateHitCount patch: {ex.Message}");
+            }
+        }
+    }
+
+    // Patch BattleConditionController.Add to announce status effects with target names
+    [HarmonyPatch(typeof(Il2CppLast.Battle.BattleConditionController), nameof(Il2CppLast.Battle.BattleConditionController.Add))]
+    public static class BattleConditionController_Add_Patch
+    {
+        private static string lastAnnouncement = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(BattleUnitData battleUnitData, int id)
+        {
+            try
+            {
+                if (battleUnitData == null)
+                {
+                    return;
+                }
+
+                // Get target name
+                string targetName = "Unknown";
+                var playerData = battleUnitData.TryCast<Il2Cpp.BattlePlayerData>();
+                if (playerData?.ownedCharacterData != null)
+                {
+                    targetName = playerData.ownedCharacterData.Name;
+                }
+                else
+                {
+                    var enemyData = battleUnitData.TryCast<BattleEnemyData>();
+                    if (enemyData != null)
+                    {
+                        string mesIdName = enemyData.GetMesIdName();
+                        var messageManager = MessageManager.Instance;
+                        if (messageManager != null && !string.IsNullOrEmpty(mesIdName))
+                        {
+                            string localizedName = messageManager.GetMessage(mesIdName);
+                            if (!string.IsNullOrEmpty(localizedName))
+                            {
+                                targetName = localizedName;
+                            }
+                        }
+                    }
+                }
+
+                // Get condition name from ID - try to access from the unit's CurrentConditionList
+                string conditionName = "Unknown status";
+                try
+                {
+                    // Try to find the newly added condition in the parameter's condition list
+                    var unitDataInfo = battleUnitData.BattleUnitDataInfo;
+                    if (unitDataInfo != null && unitDataInfo.Parameter != null)
+                    {
+                        var param = unitDataInfo.Parameter;
+                        if (param.CurrentConditionList != null && param.CurrentConditionList.Count > 0)
+                        {
+                            // Look for a condition matching our ID
+                            foreach (var condition in param.CurrentConditionList)
+                            {
+                                if (condition != null && condition.Id == id)
+                                {
+                                    string conditionMesId = condition.MesIdName;
+
+                                    // Skip conditions with no message ID (internal/hidden statuses)
+                                    if (string.IsNullOrEmpty(conditionMesId) || conditionMesId == "None")
+                                    {
+                                        return; // Skip this status announcement entirely
+                                    }
+
+                                    var messageManager = MessageManager.Instance;
+                                    if (messageManager != null)
+                                    {
+                                        string localizedConditionName = messageManager.GetMessage(conditionMesId);
+                                        if (!string.IsNullOrEmpty(localizedConditionName))
+                                        {
+                                            conditionName = localizedConditionName;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception condEx)
+                {
+                    MelonLogger.Warning($"Error resolving condition ID {id}: {condEx.Message}");
+                }
+
+                string announcement = $"{targetName}: {conditionName}";
+
+                // Skip duplicates
+                if (announcement == lastAnnouncement)
+                {
+                    return;
+                }
+                lastAnnouncement = announcement;
+
+                MelonLogger.Msg($"[Status] {announcement}");
+                FFVI_ScreenReaderMod.SpeakText(announcement);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleConditionController.Add patch: {ex.Message}");
             }
         }
     }
