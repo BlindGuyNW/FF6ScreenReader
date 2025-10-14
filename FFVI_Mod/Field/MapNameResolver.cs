@@ -15,6 +15,33 @@ namespace FFVI_ScreenReader.Field
     public static class MapNameResolver
     {
         /// <summary>
+        /// Gets the name of the current map the player is on.
+        /// </summary>
+        /// <returns>Localized map name, or "Unknown" if unable to determine</returns>
+        public static string GetCurrentMapName()
+        {
+            try
+            {
+                var userDataManager = UserDataManager.Instance();
+                if (userDataManager == null)
+                    return "Unknown";
+
+                int currentMapId = userDataManager.CurrentMapId;
+                string resolvedName = TryResolveMapNameById(currentMapId);
+
+                if (!string.IsNullOrEmpty(resolvedName))
+                    return resolvedName;
+
+                return $"Map {currentMapId}";
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"[MapNameResolver] Error getting current map name: {ex.Message}");
+                return "Unknown";
+            }
+        }
+
+        /// <summary>
         /// Gets a human-readable name for a map exit destination.
         /// </summary>
         /// <param name="gotoMapProperty">The PropertyGotoMap from a map exit entity</param>

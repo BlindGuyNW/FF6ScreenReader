@@ -84,6 +84,12 @@ namespace FFVI_ScreenReader.Core
             {
                 AnnounceGilAmount();
             }
+
+            // Hotkey: M to announce current map name
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.M))
+            {
+                AnnounceCurrentMap();
+            }
         }
 
         private void RescanEntities()
@@ -105,7 +111,7 @@ namespace FFVI_ScreenReader.Core
             }
 
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
-            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 500f);
+            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f);
 
             // Try to find the same entity in the new list (by position)
             if (previousEntity != null)
@@ -369,6 +375,20 @@ namespace FFVI_ScreenReader.Core
             {
                 LoggerInstance.Warning($"Error announcing gil amount: {ex.Message}");
                 SpeakText("Error reading gil amount");
+            }
+        }
+
+        private void AnnounceCurrentMap()
+        {
+            try
+            {
+                string mapName = Field.MapNameResolver.GetCurrentMapName();
+                SpeakText(mapName);
+            }
+            catch (System.Exception ex)
+            {
+                LoggerInstance.Warning($"Error announcing current map: {ex.Message}");
+                SpeakText("Error reading map name");
             }
         }
 
