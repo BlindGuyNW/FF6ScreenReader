@@ -216,7 +216,7 @@ namespace FFVI_ScreenReader.Patches
     public static class BattleBasicFunction_CreateDamageView_Patch
     {
         [HarmonyPostfix]
-        public static void Postfix(Il2CppLast.Battle.BattleUnitData data, int value, bool isRecovery)
+        public static void Postfix(Il2CppLast.Battle.BattleUnitData data, int value, Il2CppLast.Systems.HitType hitType, bool isRecovery)
         {
             try
             {
@@ -264,13 +264,17 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 string message;
-                if (value == 0)
+                if (hitType == Il2CppLast.Systems.HitType.Miss || value == 0)
                 {
                     message = $"{targetName}: Miss";
                 }
-                else if (isRecovery)
+                else if (hitType == Il2CppLast.Systems.HitType.Recovery)
                 {
-                    message = $"{targetName}: Recovered {value}";
+                    message = $"{targetName}: Recovered {value} HP";
+                }
+                else if (hitType == Il2CppLast.Systems.HitType.MPRecovery)
+                {
+                    message = $"{targetName}: Recovered {value} MP";
                 }
                 else
                 {
@@ -592,8 +596,6 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleMenuController), nameof(Il2CppLast.UI.KeyInput.BattleMenuController.SetCommadnMessage))]
     public static class BattleMenuController_KeyInput_SetCommadnMessage_Patch
     {
-        private static string lastMessage = "";
-
         [HarmonyPostfix]
         public static void Postfix(string message, bool isLeft)
         {
@@ -606,14 +608,6 @@ namespace FFVI_ScreenReader.Patches
 
                 // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
                 string cleanMessage = string.Copy(message.Trim());
-
-                // Skip duplicates
-                if (cleanMessage == lastMessage)
-                {
-                    return;
-                }
-
-                lastMessage = cleanMessage;
 
                 MelonLogger.Msg($"[Battle Command] {cleanMessage}");
                 FFVI_ScreenReaderMod.SpeakText(cleanMessage);

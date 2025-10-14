@@ -5,6 +5,8 @@ using MelonLoader;
 using Il2CppLast.Data;
 using Il2CppLast.Data.User;
 using Il2CppLast.UI.KeyInput;
+using Il2CppLast.Management;
+using Il2CppLast.Systems;
 using FFVI_ScreenReader.Core;
 
 namespace FFVI_ScreenReader.Patches
@@ -39,8 +41,40 @@ namespace FFVI_ScreenReader.Patches
                 // Announce items dropped
                 if (data._ItemList_k__BackingField != null && data._ItemList_k__BackingField.Count > 0)
                 {
-                    int itemCount = data._ItemList_k__BackingField.Count;
-                    messageParts.Add($"{itemCount} item{(itemCount > 1 ? "s" : "")}");
+                    var messageManager = MessageManager.Instance;
+                    if (messageManager != null)
+                    {
+                        // Convert drop items to content data with localized names
+                        var itemContentList = ListItemFormatter.GetContentDataList(data._ItemList_k__BackingField, messageManager);
+                        if (itemContentList != null && itemContentList.Count > 0)
+                        {
+                            foreach (var itemContent in itemContentList)
+                            {
+                                if (itemContent == null) continue;
+
+                                string itemName = itemContent.Name;
+                                if (string.IsNullOrEmpty(itemName)) continue;
+
+                                // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
+                                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
+                                itemName = itemName.Trim();
+
+                                if (!string.IsNullOrEmpty(itemName))
+                                {
+                                    // Get the quantity from Count property
+                                    int quantity = itemContent.Count;
+                                    if (quantity > 1)
+                                    {
+                                        messageParts.Add($"{itemName} x{quantity}");
+                                    }
+                                    else
+                                    {
+                                        messageParts.Add(itemName);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Announce character results
@@ -120,8 +154,40 @@ namespace FFVI_ScreenReader.Patches
                 // Announce items dropped
                 if (data._ItemList_k__BackingField != null && data._ItemList_k__BackingField.Count > 0)
                 {
-                    int itemCount = data._ItemList_k__BackingField.Count;
-                    messageParts.Add($"{itemCount} item{(itemCount > 1 ? "s" : "")}");
+                    var messageManager = MessageManager.Instance;
+                    if (messageManager != null)
+                    {
+                        // Convert drop items to content data with localized names
+                        var itemContentList = ListItemFormatter.GetContentDataList(data._ItemList_k__BackingField, messageManager);
+                        if (itemContentList != null && itemContentList.Count > 0)
+                        {
+                            foreach (var itemContent in itemContentList)
+                            {
+                                if (itemContent == null) continue;
+
+                                string itemName = itemContent.Name;
+                                if (string.IsNullOrEmpty(itemName)) continue;
+
+                                // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
+                                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
+                                itemName = itemName.Trim();
+
+                                if (!string.IsNullOrEmpty(itemName))
+                                {
+                                    // Get the quantity from Count property
+                                    int quantity = itemContent.Count;
+                                    if (quantity > 1)
+                                    {
+                                        messageParts.Add($"{itemName} x{quantity}");
+                                    }
+                                    else
+                                    {
+                                        messageParts.Add(itemName);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Announce character results
