@@ -212,6 +212,18 @@ namespace FFVI_ScreenReader.Field
             {
                 if (entity == null || entity.transform == null) continue;
 
+                // Skip entities whose GameObjects are inactive (moved away, killed, or despawned)
+                try
+                {
+                    if (entity.gameObject == null || !entity.gameObject.activeInHierarchy)
+                        continue;
+                }
+                catch
+                {
+                    // Entity is destroyed or invalid
+                    continue;
+                }
+
                 // Get entity type info first
                 var info = new EntityInfo
                 {

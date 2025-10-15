@@ -148,6 +148,19 @@ namespace FFVI_ScreenReader.Core
             }
 
             var entityInfo = cachedEntities[currentEntityIndex];
+
+            // Validate entity is still active before using it
+            if (!IsEntityValid(entityInfo))
+            {
+                // Entity has become invalid, rescan and try again
+                RescanEntities();
+                if (cachedEntities.Count == 0)
+                {
+                    SpeakText("No entities nearby");
+                    return;
+                }
+                entityInfo = cachedEntities[currentEntityIndex];
+            }
             // CRITICAL: Touch controller uses localPosition, NOT position!
             Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
             Vector3 targetPos = entityInfo.Entity.transform.localPosition;
@@ -218,6 +231,19 @@ namespace FFVI_ScreenReader.Core
             }
 
             var entityInfo = cachedEntities[currentEntityIndex];
+
+            // Validate entity is still active before using it
+            if (!IsEntityValid(entityInfo))
+            {
+                // Entity has become invalid, rescan and try again
+                RescanEntities();
+                if (cachedEntities.Count == 0)
+                {
+                    SpeakText("No entities nearby");
+                    return;
+                }
+                entityInfo = cachedEntities[currentEntityIndex];
+            }
             // CRITICAL: Touch controller uses localPosition, NOT position!
             Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
             Vector3 targetPos = entityInfo.Entity.transform.localPosition;
@@ -248,6 +274,14 @@ namespace FFVI_ScreenReader.Core
             }
 
             var entityInfo = cachedEntities[currentEntityIndex];
+
+            // Validate entity is still active before teleporting
+            if (!IsEntityValid(entityInfo))
+            {
+                SpeakText("Entity no longer available");
+                RescanEntities();
+                return;
+            }
 
             var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
@@ -389,6 +423,33 @@ namespace FFVI_ScreenReader.Core
             {
                 LoggerInstance.Warning($"Error announcing current map: {ex.Message}");
                 SpeakText("Error reading map name");
+            }
+        }
+
+        /// <summary>
+        /// Validates that an entity is still active and accessible in the game world.
+        /// </summary>
+        private bool IsEntityValid(EntityInfo entityInfo)
+        {
+            if (entityInfo?.Entity == null)
+                return false;
+
+            try
+            {
+                // Check if the GameObject is still active in the hierarchy
+                if (entityInfo.Entity.gameObject == null || !entityInfo.Entity.gameObject.activeInHierarchy)
+                    return false;
+
+                // Check if the transform is still valid
+                if (entityInfo.Entity.transform == null)
+                    return false;
+
+                return true;
+            }
+            catch
+            {
+                // Entity has been destroyed or is otherwise invalid
+                return false;
             }
         }
 
