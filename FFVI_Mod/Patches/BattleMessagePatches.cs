@@ -634,6 +634,13 @@ namespace FFVI_ScreenReader.Patches
                 // Store the currently active character for health/status readouts
                 CurrentActiveCharacter = targetData;
 
+                // CRITICAL: Reset enemy targeting state when a new turn begins
+                // This ensures enemy names are announced every time, even if the same enemy
+                // was targeted on previous turns
+                BattleTargetSelectController_SelectContent_Enemy_Patch.lastAnnouncedIndex = -1;
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncedIndex = -1;
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncement = "";
+
                 if (targetData != null && targetData.ownedCharacterData != null)
                 {
                     string characterName = targetData.ownedCharacterData.Name;
@@ -738,8 +745,8 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Player_Patch
     {
-        private static int lastAnnouncedIndex = -1;
-        private static string lastAnnouncement = "";
+        public static int lastAnnouncedIndex = -1;
+        public static string lastAnnouncement = "";
 
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2Cpp.BattlePlayerData> list, int index)
@@ -798,6 +805,10 @@ namespace FFVI_ScreenReader.Patches
                             lastAnnouncedIndex = index;
                             lastAnnouncement = announcement;
 
+                            // Reset enemy targeting tracking when player is selected
+                            // This ensures switching between enemy/player targets announces correctly
+                            BattleTargetSelectController_SelectContent_Enemy_Patch.lastAnnouncedIndex = -1;
+
                             MelonLogger.Msg($"[Player Target] {announcement}");
                             FFVI_ScreenReaderMod.SpeakText(announcement);
                         }
@@ -811,12 +822,29 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
+    // Reset tracking state when targeting cursor becomes active
+    [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SetActiveCursor))]
+    public static class BattleTargetSelectController_SetActiveCursor_Patch
+    {
+        [HarmonyPrefix]
+        public static void Prefix(bool isActive)
+        {
+            if (isActive)
+            {
+                // Reset tracking when cursor becomes active so first selection is always announced
+                // This provides defense-in-depth along with the reset in SetCommandSelectTarget
+                BattleTargetSelectController_SelectContent_Enemy_Patch.lastAnnouncedIndex = -1;
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncedIndex = -1;
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncement = "";
+            }
+        }
+    }
+
     // Patch BattleTargetSelectController.SelectContent to announce enemy names during targeting
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleTargetSelectController), nameof(Il2CppLast.UI.KeyInput.BattleTargetSelectController.SelectContent), new Type[] { typeof(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData>), typeof(int) })]
     public static class BattleTargetSelectController_SelectContent_Enemy_Patch
     {
-        private static int lastAnnouncedIndex = -1;
-        private static string lastAnnouncement = "";
+        public static int lastAnnouncedIndex = -1;
 
         [HarmonyPostfix]
         public static void Postfix(Il2CppSystem.Collections.Generic.IEnumerable<Il2CppLast.Battle.BattleEnemyData> list, int index)
@@ -836,6 +864,20 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Skip duplicate announcements based on index only
+                // This prevents re-announcing when SelectContent is called multiple times for the same selection
+                // but allows re-announcement when navigating back to the same enemy after selecting a different one
+                if (index == lastAnnouncedIndex)
+                {
+                    return;
+                }
+                lastAnnouncedIndex = index;
+
+                // Reset player targeting tracking when enemy is selected
+                // This ensures switching between enemy/player targets announces correctly
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncedIndex = -1;
+                BattleTargetSelectController_SelectContent_Player_Patch.lastAnnouncement = "";
+
                 // Get the enemy at the specified index
                 if (index >= 0 && index < enemyList.Count)
                 {
@@ -854,6 +896,38 @@ namespace FFVI_ScreenReader.Patches
                                     // Build announcement with HP information
                                     string announcement = localizedName;
 
+                                    // Check if there are multiple enemies with the same name
+                                    int sameNameCount = 0;
+                                    int positionInGroup = 0;
+                                    for (int i = 0; i < enemyList.Count; i++)
+                                    {
+                                        var enemy = enemyList[i];
+                                        if (enemy != null)
+                                        {
+                                            string enemyMesId = enemy.GetMesIdName();
+                                            if (!string.IsNullOrEmpty(enemyMesId))
+                                            {
+                                                string enemyName = messageManager.GetMessage(enemyMesId);
+                                                if (enemyName == localizedName)
+                                                {
+                                                    sameNameCount++;
+                                                    if (i < index)
+                                                    {
+                                                        positionInGroup++;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Add positional indicator if there are multiple enemies with the same name
+                                    if (sameNameCount > 1)
+                                    {
+                                        // Use letter suffixes: A, B, C, etc.
+                                        char letter = (char)('A' + positionInGroup);
+                                        announcement += $" {letter}";
+                                    }
+
                                     // Try to get HP from BattleUnitDataInfo
                                     try
                                     {
@@ -871,14 +945,6 @@ namespace FFVI_ScreenReader.Patches
                                         MelonLogger.Warning($"Error reading HP for {localizedName}: {hpEx.Message}");
                                         // Continue with just the name if HP can't be read
                                     }
-
-                                    // Skip duplicate announcements (same index AND same announcement)
-                                    if (index == lastAnnouncedIndex && announcement == lastAnnouncement)
-                                    {
-                                        return;
-                                    }
-                                    lastAnnouncedIndex = index;
-                                    lastAnnouncement = announcement;
 
                                     MelonLogger.Msg($"[Enemy Target] {announcement}");
                                     FFVI_ScreenReaderMod.SpeakText(announcement);
