@@ -197,6 +197,14 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance = 100f)
         {
+            return GetNearbyEntities(playerPos, maxDistance, FFVI_ScreenReader.Core.EntityCategory.All);
+        }
+
+        /// <summary>
+        /// Gets information about nearby entities filtered by category
+        /// </summary>
+        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance, FFVI_ScreenReader.Core.EntityCategory category)
+        {
             var results = new List<EntityInfo>();
 
             // Get the game's master entity list from FieldController
@@ -353,6 +361,9 @@ namespace FFVI_ScreenReader.Field
             // Filter out doors/triggers that are immediately before map exits
             results = FilterDoorBeforeMapExit(results, playerPos);
 
+            // Filter by category
+            results = FilterByCategory(results, category);
+
             // Sort by distance
             results.Sort((a, b) => a.Distance.CompareTo(b.Distance));
 
@@ -476,6 +487,59 @@ namespace FFVI_ScreenReader.Field
 
             // Return filtered list
             return entities.Where(e => !toRemove.Contains(e)).ToList();
+        }
+
+        /// <summary>
+        /// Filters entities by category
+        /// </summary>
+        private static List<EntityInfo> FilterByCategory(List<EntityInfo> entities, FFVI_ScreenReader.Core.EntityCategory category)
+        {
+            // If "All" category, return all entities
+            if (category == FFVI_ScreenReader.Core.EntityCategory.All)
+                return entities;
+
+            var filtered = new List<EntityInfo>();
+
+            foreach (var entity in entities)
+            {
+                bool includeEntity = false;
+
+                switch (category)
+                {
+                    case FFVI_ScreenReader.Core.EntityCategory.Chests:
+                        // Include only treasure boxes
+                        includeEntity = entity.ObjectType == Il2Cpp.MapConstants.ObjectType.TreasureBox;
+                        break;
+
+                    case FFVI_ScreenReader.Core.EntityCategory.NPCs:
+                        // Include all NPC types
+                        includeEntity = entity.ObjectType == Il2Cpp.MapConstants.ObjectType.NPC ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.ShopNPC;
+                        break;
+
+                    case FFVI_ScreenReader.Core.EntityCategory.MapExits:
+                        // Include map exits and doors/triggers
+                        includeEntity = entity.ObjectType == Il2Cpp.MapConstants.ObjectType.GotoMap ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.OpenTrigger;
+                        break;
+
+                    case FFVI_ScreenReader.Core.EntityCategory.Events:
+                        // Include save points, teleports, and events
+                        includeEntity = entity.ObjectType == Il2Cpp.MapConstants.ObjectType.SavePoint ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.TelepoPoint ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.Event ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.SwitchEvent ||
+                                        entity.ObjectType == Il2Cpp.MapConstants.ObjectType.RandomEvent;
+                        break;
+                }
+
+                if (includeEntity)
+                {
+                    filtered.Add(entity);
+                }
+            }
+
+            return filtered;
         }
 
         /// <summary>

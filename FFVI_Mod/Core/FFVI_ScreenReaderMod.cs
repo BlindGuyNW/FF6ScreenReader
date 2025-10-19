@@ -11,6 +11,18 @@ using Il2CppLast.Map;
 namespace FFVI_ScreenReader.Core
 {
     /// <summary>
+    /// Entity category for filtering navigation targets
+    /// </summary>
+    public enum EntityCategory
+    {
+        All = 0,
+        Chests = 1,
+        NPCs = 2,
+        MapExits = 3,
+        Events = 4
+    }
+
+    /// <summary>
     /// Main mod class for FFVI Screen Reader.
     /// Provides screen reader accessibility support for Final Fantasy VI Pixel Remaster.
     /// </summary>
@@ -23,6 +35,7 @@ namespace FFVI_ScreenReader.Core
         private float lastEntityScanTime = 0f;
         private System.Collections.Generic.List<EntityInfo> cachedEntities = new System.Collections.Generic.List<EntityInfo>();
         private int currentEntityIndex = 0;
+        private EntityCategory currentCategory = EntityCategory.All;
 
         public override void OnInitializeMelon()
         {
@@ -90,6 +103,24 @@ namespace FFVI_ScreenReader.Core
             {
                 AnnounceCurrentMap();
             }
+
+            // Hotkey: = (Equals) to cycle to next category
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Equals))
+            {
+                CycleNextCategory();
+            }
+
+            // Hotkey: - (Minus) to cycle to previous category
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Minus))
+            {
+                CyclePreviousCategory();
+            }
+
+            // Hotkey: 0 (Alpha0) to reset to All category
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha0))
+            {
+                ResetToAllCategory();
+            }
         }
 
         private void RescanEntities()
@@ -111,7 +142,7 @@ namespace FFVI_ScreenReader.Core
             }
 
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
-            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f);
+            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f, currentCategory);
 
             // Try to find the same entity in the new list (by position)
             if (previousEntity != null)
@@ -263,6 +294,80 @@ namespace FFVI_ScreenReader.Core
             string countSuffix = $", {currentEntityIndex + 1} of {cachedEntities.Count}";
             string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}, no path{countSuffix}";
             SpeakText(announcement);
+        }
+
+        private void CycleNextCategory()
+        {
+            // Cycle to next category
+            int nextCategory = ((int)currentCategory + 1) % 5;  // 5 categories total
+            currentCategory = (EntityCategory)nextCategory;
+
+            // Rescan with new category
+            RescanEntities();
+
+            // Announce new category and count
+            AnnounceCategoryChange();
+        }
+
+        private void CyclePreviousCategory()
+        {
+            // Cycle to previous category
+            int prevCategory = (int)currentCategory - 1;
+            if (prevCategory < 0)
+                prevCategory = 4;  // Wrap to last category (Events)
+
+            currentCategory = (EntityCategory)prevCategory;
+
+            // Rescan with new category
+            RescanEntities();
+
+            // Announce new category and count
+            AnnounceCategoryChange();
+        }
+
+        private void ResetToAllCategory()
+        {
+            if (currentCategory == EntityCategory.All)
+            {
+                SpeakText("Already in All category");
+                return;
+            }
+
+            currentCategory = EntityCategory.All;
+
+            // Rescan with All category
+            RescanEntities();
+
+            // Announce category change
+            AnnounceCategoryChange();
+        }
+
+        private void AnnounceCategoryChange()
+        {
+            string categoryName = GetCategoryName(currentCategory);
+            int entityCount = cachedEntities.Count;
+
+            string announcement = $"Category: {categoryName}, {entityCount} {(entityCount == 1 ? "entity" : "entities")}";
+            SpeakText(announcement);
+        }
+
+        private string GetCategoryName(EntityCategory category)
+        {
+            switch (category)
+            {
+                case EntityCategory.All:
+                    return "All";
+                case EntityCategory.Chests:
+                    return "Chests";
+                case EntityCategory.NPCs:
+                    return "NPCs";
+                case EntityCategory.MapExits:
+                    return "Map Exits";
+                case EntityCategory.Events:
+                    return "Events";
+                default:
+                    return "Unknown";
+            }
         }
 
         private void TeleportToCurrentEntity()
