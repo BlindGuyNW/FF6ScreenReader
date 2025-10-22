@@ -158,6 +158,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is status details screen (handled by StatusDetailsController patches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("status") || parent.name.Contains("Status"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -314,6 +325,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("party") || parent.name.Contains("Party"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is status details screen (handled by StatusDetailsController patches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("status") || parent.name.Contains("Status"))
                     {
                         return;
                     }
@@ -482,6 +504,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is status details screen (handled by StatusDetailsController patches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("status") || parent.name.Contains("Status"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -638,6 +671,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("party") || parent.name.Contains("Party"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is status details screen (handled by StatusDetailsController patches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("status") || parent.name.Contains("Status"))
                     {
                         return;
                     }

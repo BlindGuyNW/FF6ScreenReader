@@ -67,16 +67,39 @@ namespace FFVI_ScreenReader.Core
                 AnnounceCurrentEntity();
             }
 
-            // Hotkey: Right bracket ] to cycle to next entity
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
-            {
-                CycleNext();
-            }
+            // Check if status details screen is active to route bracket keys appropriately
+            var statusController = UnityEngine.Object.FindObjectOfType<Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController>();
+            bool statusScreenActive = statusController != null &&
+                                     statusController.gameObject != null &&
+                                     statusController.gameObject.activeInHierarchy;
 
-            // Hotkey: Left bracket [ to cycle to previous entity
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
+            if (statusScreenActive)
             {
-                CyclePrevious();
+                // On status screen: bracket keys announce stats
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
+                {
+                    string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
+                    SpeakText(physicalStats);
+                }
+
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
+                {
+                    string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
+                    SpeakText(magicalStats);
+                }
+            }
+            else
+            {
+                // On field: bracket keys cycle entities
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
+                {
+                    CycleNext();
+                }
+
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
+                {
+                    CyclePrevious();
+                }
             }
 
             // Hotkey: Ctrl+Enter to teleport to currently selected entity
