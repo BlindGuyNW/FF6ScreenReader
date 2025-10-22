@@ -147,6 +147,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("party") || parent.name.Contains("Party"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -292,6 +303,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("party") || parent.name.Contains("Party"))
                     {
                         return;
                     }
@@ -449,6 +471,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("party") || parent.name.Contains("Party"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -594,6 +627,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("party") || parent.name.Contains("Party"))
                     {
                         return;
                     }
