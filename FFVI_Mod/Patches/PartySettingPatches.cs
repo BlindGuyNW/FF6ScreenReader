@@ -225,14 +225,22 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Calculate which party and position from the flat index
-                // The slot grid is: Party 1 (0-3), Party 2 (4-7), Party 3 (8-11)
-                const int POSITIONS_PER_PARTY = 4;
-                int partyNumber = (index / POSITIONS_PER_PARTY) + 1;
-                int position = (index % POSITIONS_PER_PARTY) + 1;
+                int slotCount = __instance.slotCount;
+
+                // The slot grid is arranged as a 2x2 grid PER PARTY
+                // Layout: parties arranged horizontally, each with 2x2 positions
+                // Example with 3 parties (slotCount=3):
+                //   Row 0: [P1 P1] [P2 P2] [P3 P3]  (indices 0,1,2,3,4,5)
+                //   Row 1: [P1 P1] [P2 P2] [P3 P3]  (indices 6,7,8,9,10,11)
+                const int PARTY_WIDTH = 2; // each party occupies 2 columns
+                int totalWidth = slotCount * PARTY_WIDTH; // total columns in grid (e.g., 3 * 2 = 6)
+                int row = index / totalWidth; // which row (0 or 1)
+                int col = index % totalWidth; // which column (0-5)
+                int partyNumber = (col / PARTY_WIDTH) + 1; // which party (1, 2, or 3)
+                int position = (row * PARTY_WIDTH) + (col % PARTY_WIDTH) + 1; // position within party (1-4)
 
                 // Get the character ID in this slot
-                int characterId = __instance.GetSlotPostionCharaterId(__instance.slotCount, index);
+                int characterId = __instance.GetSlotPostionCharaterId(slotCount, index);
 
                 string announcement;
                 if (characterId == 0)
