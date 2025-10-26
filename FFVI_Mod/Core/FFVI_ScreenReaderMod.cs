@@ -19,7 +19,8 @@ namespace FFVI_ScreenReader.Core
         Chests = 1,
         NPCs = 2,
         MapExits = 3,
-        Events = 4
+        Events = 4,
+        Vehicles = 5
     }
 
     /// <summary>
@@ -109,10 +110,20 @@ namespace FFVI_ScreenReader.Core
                 TeleportToCurrentEntity();
             }
 
-            // Hotkey: H to announce current character's health/status in battle
+            // Hotkey: H to announce airship heading (if on airship) or character health (if in battle)
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.H))
             {
-                AnnounceCurrentCharacterStatus();
+                // Check if we're on the airship first
+                var airshipController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                if (airshipController != null && airshipController.fieldPlayer != null)
+                {
+                    AnnounceAirshipStatus();
+                }
+                else
+                {
+                    // Fall back to battle character status
+                    AnnounceCurrentCharacterStatus();
+                }
             }
 
             // Hotkey: G to announce current gil amount
@@ -322,7 +333,7 @@ namespace FFVI_ScreenReader.Core
         private void CycleNextCategory()
         {
             // Cycle to next category
-            int nextCategory = ((int)currentCategory + 1) % 5;  // 5 categories total
+            int nextCategory = ((int)currentCategory + 1) % 6;  // 6 categories total
             currentCategory = (EntityCategory)nextCategory;
 
             // Rescan with new category
@@ -337,7 +348,7 @@ namespace FFVI_ScreenReader.Core
             // Cycle to previous category
             int prevCategory = (int)currentCategory - 1;
             if (prevCategory < 0)
-                prevCategory = 4;  // Wrap to last category (Events)
+                prevCategory = 5;  // Wrap to last category (Vehicles)
 
             currentCategory = (EntityCategory)prevCategory;
 
@@ -388,6 +399,8 @@ namespace FFVI_ScreenReader.Core
                     return "Map Exits";
                 case EntityCategory.Events:
                     return "Events";
+                case EntityCategory.Vehicles:
+                    return "Vehicles";
                 default:
                     return "Unknown";
             }
@@ -551,6 +564,66 @@ namespace FFVI_ScreenReader.Core
             {
                 LoggerInstance.Warning($"Error announcing current map: {ex.Message}");
                 SpeakText("Error reading map name");
+            }
+        }
+
+        private void AnnounceAirshipStatus()
+        {
+            try
+            {
+                var fieldMap = UnityEngine.Object.FindObjectOfType<FieldMap>();
+                if (fieldMap == null || fieldMap.fieldController == null)
+                {
+                    SpeakText("Airship status not available");
+                    return;
+                }
+
+                var airshipController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                if (airshipController == null || airshipController.fieldPlayer == null)
+                {
+                    SpeakText("Not on airship");
+                    return;
+                }
+
+                var statusParts = new System.Collections.Generic.List<string>();
+
+                // Get current direction in degrees
+                float rotationZ = fieldMap.fieldController.GetZAxisRotateBirdCamera();
+                // Normalize to 0-360 range
+                float normalizedRotation = ((rotationZ % 360) + 360) % 360;
+                // Mirror the rotation to match our E/W swapped compass directions
+                float mirroredRotation = (360 - normalizedRotation) % 360;
+                statusParts.Add($"Heading {mirroredRotation:F0} degrees");
+
+                // Get current altitude
+                float altitudeRatio = fieldMap.fieldController.GetFlightAltitudeFieldOfViewRatio(true);
+                string altitude = Utils.AirshipNavigationReader.GetAltitudeDescription(altitudeRatio);
+                statusParts.Add(altitude);
+
+                // Get landing zone status
+                Vector3 airshipPos = airshipController.fieldPlayer.transform.localPosition;
+                string terrainName;
+                bool canLand;
+                bool success = Utils.AirshipNavigationReader.GetTerrainAtPosition(
+                    airshipPos,
+                    fieldMap.fieldController,
+                    out terrainName,
+                    out canLand
+                );
+
+                if (success)
+                {
+                    string landingStatus = Utils.AirshipNavigationReader.BuildLandingZoneAnnouncement(terrainName, canLand);
+                    statusParts.Add(landingStatus);
+                }
+
+                string statusMessage = string.Join(". ", statusParts);
+                SpeakText(statusMessage);
+            }
+            catch (System.Exception ex)
+            {
+                LoggerInstance.Warning($"Error announcing airship status: {ex.Message}");
+                SpeakText("Error reading airship status");
             }
         }
 

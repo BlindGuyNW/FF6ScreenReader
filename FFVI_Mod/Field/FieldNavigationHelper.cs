@@ -259,6 +259,7 @@ namespace FFVI_ScreenReader.Field
                 }
 
                 // Filter: Skip non-interactive types (visual/effect entities, area constraints, hazards)
+                // NOTE: Vehicles come from NeedInteractiveList(), not from entityList, so safe to filter these
                 if (info.ObjectType == Il2Cpp.MapConstants.ObjectType.PointIn ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.CollisionEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.AnimEntity ||
@@ -353,6 +354,60 @@ namespace FFVI_ScreenReader.Field
                 }
 
                 results.Add(info);
+            }
+
+            // ALSO scan transportation controller for landed vehicles (airship, chocobo, etc.)
+            if (fieldMap.fieldController.transportation != null)
+            {
+                var transportationEntities = fieldMap.fieldController.transportation.NeedInteractiveList();
+                if (transportationEntities != null)
+                {
+                    foreach (var interactiveEntity in transportationEntities)
+                    {
+                        if (interactiveEntity == null) continue;
+
+                        // Try to cast to FieldEntity
+                        var entity = interactiveEntity.TryCast<Il2CppLast.Entity.Field.FieldEntity>();
+                        if (entity == null || entity.transform == null) continue;
+
+                        // Check if active in hierarchy
+                        try
+                        {
+                            if (entity.gameObject == null || !entity.gameObject.activeInHierarchy)
+                                continue;
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        // Calculate distance
+                        float distance = Vector3.Distance(playerPos, entity.transform.position);
+                        if (distance > maxDistance) continue;
+
+                        // Create entity info
+                        var vehicleInfo = new EntityInfo
+                        {
+                            Entity = entity,
+                            Position = entity.transform.position,
+                            Distance = distance,
+                            Direction = "",
+                            EntityType = entity.GetType().Name
+                        };
+
+                        // Get name and type from property
+                        // Since these came from NeedInteractiveList(), they're vehicles
+                        // Give them a descriptive name
+                        vehicleInfo.Name = "Landed Vehicle";
+
+                        if (entity.Property != null)
+                        {
+                            vehicleInfo.ObjectType = (Il2Cpp.MapConstants.ObjectType)entity.Property.ObjectType;
+                        }
+
+                        results.Add(vehicleInfo);
+                    }
+                }
             }
 
             // De-duplicate entities at the same position
@@ -530,6 +585,11 @@ namespace FFVI_ScreenReader.Field
                                         entity.ObjectType == Il2Cpp.MapConstants.ObjectType.Event ||
                                         entity.ObjectType == Il2Cpp.MapConstants.ObjectType.SwitchEvent ||
                                         entity.ObjectType == Il2Cpp.MapConstants.ObjectType.RandomEvent;
+                        break;
+
+                    case FFVI_ScreenReader.Core.EntityCategory.Vehicles:
+                        // Include vehicles/transportation (airship, chocobo, etc.)
+                        includeEntity = entity.ObjectType == Il2Cpp.MapConstants.ObjectType.TransportationEventAction;
                         break;
                 }
 
@@ -914,6 +974,30 @@ namespace FFVI_ScreenReader.Field
 
             // Fallback to class name
             return info.EntityType.Replace("Field", "");
+        }
+
+        /// <summary>
+        /// Convert transportation ID to friendly name
+        /// </summary>
+        private static string GetTransportationName(int transportationId)
+        {
+            // Based on MapConstants.TransportationType enum
+            switch (transportationId)
+            {
+                case 1: return "Player";  // TransportationType.Player
+                case 2: return "Ship";  // TransportationType.Ship
+                case 3: return "Airship";  // TransportationType.Plane
+                case 4: return "Symbol";  // TransportationType.Symbol
+                case 5: return "Content";  // TransportationType.Content
+                case 6: return "Submarine";  // TransportationType.Submarine
+                case 7: return "Low Flying Airship";  // TransportationType.LowFlying
+                case 8: return "Special Airship";  // TransportationType.SpecialPlane
+                case 9: return "Yellow Chocobo";  // TransportationType.YellowChocobo
+                case 10: return "Black Chocobo";  // TransportationType.BlackChocobo
+                case 11: return "Boko";  // TransportationType.Boko
+                case 12: return "Magical Armor";  // TransportationType.MagicalArmor
+                default: return $"Vehicle {transportationId}";
+            }
         }
     }
 
