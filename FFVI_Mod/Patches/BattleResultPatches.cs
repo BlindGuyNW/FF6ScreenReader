@@ -102,6 +102,39 @@ namespace FFVI_ScreenReader.Patches
                         {
                             messageParts.Add($"{charName} gained {charExp:N0} XP");
                         }
+
+                        // Check if learned any abilities
+                        var learningList = charResult.LearningList;
+                        if (learningList != null && learningList.Count > 0)
+                        {
+                            var messageManager = MessageManager.Instance;
+                            if (messageManager != null && afterData.OwnedAbilityList != null)
+                            {
+                                foreach (int abilityId in learningList)
+                                {
+                                    // Find ability data from the character's owned abilities
+                                    OwnedAbility ownedAbility = null;
+                                    for (int i = 0; i < afterData.OwnedAbilityList.Count; i++)
+                                    {
+                                        var ability = afterData.OwnedAbilityList[i];
+                                        if (ability != null && ability.Ability != null && ability.Ability.Id == abilityId)
+                                        {
+                                            ownedAbility = ability;
+                                            break;
+                                        }
+                                    }
+
+                                    if (ownedAbility != null)
+                                    {
+                                        string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
+                                        if (!string.IsNullOrWhiteSpace(abilityName))
+                                        {
+                                            messageParts.Add($"{charName} learned {abilityName}");
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -214,6 +247,39 @@ namespace FFVI_ScreenReader.Patches
                         else
                         {
                             messageParts.Add($"{charName} gained {charExp:N0} XP");
+                        }
+
+                        // Check if learned any abilities
+                        var learningList = charResult.LearningList;
+                        if (learningList != null && learningList.Count > 0)
+                        {
+                            var messageManager = MessageManager.Instance;
+                            if (messageManager != null && afterData.OwnedAbilityList != null)
+                            {
+                                foreach (int abilityId in learningList)
+                                {
+                                    // Find ability data from the character's owned abilities
+                                    OwnedAbility ownedAbility = null;
+                                    for (int i = 0; i < afterData.OwnedAbilityList.Count; i++)
+                                    {
+                                        var ability = afterData.OwnedAbilityList[i];
+                                        if (ability != null && ability.Ability != null && ability.Ability.Id == abilityId)
+                                        {
+                                            ownedAbility = ability;
+                                            break;
+                                        }
+                                    }
+
+                                    if (ownedAbility != null)
+                                    {
+                                        string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
+                                        if (!string.IsNullOrWhiteSpace(abilityName))
+                                        {
+                                            messageParts.Add($"{charName} learned {abilityName}");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -169,6 +169,21 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is ability menu navigation (handled by AbilityMenuPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("ability") ||
+                        parentName.Contains("magicstone") ||
+                        parentName.Contains("magic_stone") ||
+                        parentName.Contains("esper"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -336,6 +351,21 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("status") || parent.name.Contains("Status"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is ability menu navigation (handled by AbilityMenuPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("ability") ||
+                        parentName.Contains("magicstone") ||
+                        parentName.Contains("magic_stone") ||
+                        parentName.Contains("esper"))
                     {
                         return;
                     }
@@ -515,6 +545,21 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is ability menu navigation (handled by AbilityMenuPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("ability") ||
+                        parentName.Contains("magicstone") ||
+                        parentName.Contains("magic_stone") ||
+                        parentName.Contains("esper"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Use managed coroutine system
                 var coroutine = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
@@ -682,6 +727,21 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("status") || parent.name.Contains("Status"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is ability menu navigation (handled by AbilityMenuPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    string parentName = parent.name.ToLower();
+                    if (parentName.Contains("ability") ||
+                        parentName.Contains("magicstone") ||
+                        parentName.Contains("magic_stone") ||
+                        parentName.Contains("esper"))
                     {
                         return;
                     }
