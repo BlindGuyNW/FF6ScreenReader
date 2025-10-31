@@ -689,9 +689,11 @@ namespace FFVI_ScreenReader.Core
         /// Speak text through the screen reader.
         /// Thread-safe: TolkWrapper uses locking to prevent concurrent native calls.
         /// </summary>
-        public static void SpeakText(string text)
+        /// <param name="text">Text to speak</param>
+        /// <param name="interrupt">Whether to interrupt current speech (true for user actions, false for game events)</param>
+        public static void SpeakText(string text, bool interrupt = true)
         {
-            tolk?.Speak(text);
+            tolk?.Speak(text, interrupt);
         }
     }
 }

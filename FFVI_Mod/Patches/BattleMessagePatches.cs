@@ -47,7 +47,7 @@ namespace FFVI_ScreenReader.Patches
 
                 lastSpeaker = cleanSpeaker;
                 MelonLogger.Msg($"[Speaker] {cleanSpeaker}");
-                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker);
+                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -84,7 +84,7 @@ namespace FFVI_ScreenReader.Patches
 
                 lastSpeaker = cleanSpeaker;
                 MelonLogger.Msg($"[Battle Speaker] {cleanSpeaker}");
-                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker);
+                FFVI_ScreenReaderMod.SpeakText(cleanSpeaker, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -169,14 +169,14 @@ namespace FFVI_ScreenReader.Patches
                     if (!string.IsNullOrWhiteSpace(newText))
                     {
                         MelonLogger.Msg($"[MessageWindowView.SetMessage - New] {newText}");
-                        FFVI_ScreenReaderMod.SpeakText(newText);
+                        FFVI_ScreenReaderMod.SpeakText(newText, interrupt: false);
                     }
                 }
                 else
                 {
                     // This is a completely new message, announce it all
                     MelonLogger.Msg($"[MessageWindowView.SetMessage - Full] {cleanMessage}");
-                    FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                    FFVI_ScreenReaderMod.SpeakText(cleanMessage, interrupt: false);
                 }
 
                 lastMessage = cleanMessage;
@@ -203,7 +203,7 @@ namespace FFVI_ScreenReader.Patches
 
                 string cleanMessage = message.Trim();
                 MelonLogger.Msg($"[ScrollMessage] {cleanMessage}");
-                FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                FFVI_ScreenReaderMod.SpeakText(cleanMessage, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -282,7 +282,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 MelonLogger.Msg($"[Damage] {message}");
-                FFVI_ScreenReaderMod.SpeakText(message);
+                FFVI_ScreenReaderMod.SpeakText(message, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -479,7 +479,7 @@ namespace FFVI_ScreenReader.Patches
             {
                 string message = $"{hitCountValue} hits";
                 MelonLogger.Msg($"[Hit Count] {message}");
-                FFVI_ScreenReaderMod.SpeakText(message);
+                FFVI_ScreenReaderMod.SpeakText(message, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -583,7 +583,7 @@ namespace FFVI_ScreenReader.Patches
                 lastAnnouncement = announcement;
 
                 MelonLogger.Msg($"[Status] {announcement}");
-                FFVI_ScreenReaderMod.SpeakText(announcement);
+                FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -610,7 +610,7 @@ namespace FFVI_ScreenReader.Patches
                 string cleanMessage = string.Copy(message.Trim());
 
                 MelonLogger.Msg($"[Battle Command] {cleanMessage}");
-                FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                FFVI_ScreenReaderMod.SpeakText(cleanMessage, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -656,7 +656,7 @@ namespace FFVI_ScreenReader.Patches
 
                         string message = $"{characterName}'s turn";
                         MelonLogger.Msg($"[Battle Turn] {message}");
-                        FFVI_ScreenReaderMod.SpeakText(message);
+                        FFVI_ScreenReaderMod.SpeakText(message, interrupt: false);
                     }
                 }
             }
@@ -731,7 +731,7 @@ namespace FFVI_ScreenReader.Patches
                 lastMessage = cleanMessage;
 
                 MelonLogger.Msg($"[BattleUIManager.SetCommandText] {cleanMessage}");
-                FFVI_ScreenReaderMod.SpeakText(cleanMessage);
+                FFVI_ScreenReaderMod.SpeakText(cleanMessage, interrupt: false);
             }
             catch (Exception ex)
             {

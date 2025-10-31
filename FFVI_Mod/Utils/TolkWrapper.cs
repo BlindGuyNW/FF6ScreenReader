@@ -46,7 +46,7 @@ namespace FFVI_ScreenReader.Utils
             }
         }
 
-        public void Speak(string text)
+        public void Speak(string text, bool interrupt = true)
         {
             try
             {
@@ -55,7 +55,7 @@ namespace FFVI_ScreenReader.Utils
                     // Thread-safe: ensure only one Tolk call at a time to prevent native crashes
                     lock (tolkLock)
                     {
-                        tolk.Output(text, true);
+                        tolk.Output(text, interrupt);
                     }
                 }
             }

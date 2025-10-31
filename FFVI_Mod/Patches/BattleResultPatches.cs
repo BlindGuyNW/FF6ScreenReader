@@ -152,7 +152,7 @@ namespace FFVI_ScreenReader.Patches
                 lastBattleData = data;
                 lastAnnouncement = announcement;
                 MelonLogger.Msg($"[Battle Results] {announcement}");
-                FFVI_ScreenReaderMod.SpeakText(announcement);
+                FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -299,7 +299,7 @@ namespace FFVI_ScreenReader.Patches
                 ResultMenuController_Show_Patch.lastBattleData = data;
                 ResultMenuController_Show_Patch.lastAnnouncement = announcement;
                 MelonLogger.Msg($"[Battle Results ShowPointsInit] {announcement}");
-                FFVI_ScreenReaderMod.SpeakText(announcement);
+                FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: false);
             }
             catch (Exception ex)
             {
