@@ -113,9 +113,24 @@ namespace FFVI_ScreenReader.Core
             // Hotkey: H to announce airship heading (if on airship) or character health (if in battle)
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.H))
             {
-                // Check if we're on the airship first
-                var airshipController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
-                if (airshipController != null && airshipController.fieldPlayer != null)
+                // Check if we're on the airship by finding an active airship controller with input enabled
+                var allControllers = UnityEngine.Object.FindObjectsOfType<FieldPlayerController>();
+                Il2CppLast.Map.FieldPlayerKeyAirshipController activeAirshipController = null;
+
+                foreach (var controller in allControllers)
+                {
+                    if (controller != null && controller.gameObject != null && controller.gameObject.activeInHierarchy)
+                    {
+                        var airshipController = controller.TryCast<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                        if (airshipController != null && airshipController.InputEnable)
+                        {
+                            activeAirshipController = airshipController;
+                            break;
+                        }
+                    }
+                }
+
+                if (activeAirshipController != null)
                 {
                     AnnounceAirshipStatus();
                 }
@@ -578,7 +593,23 @@ namespace FFVI_ScreenReader.Core
                     return;
                 }
 
-                var airshipController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                // Find the active airship controller with input enabled
+                var allControllers = UnityEngine.Object.FindObjectsOfType<FieldPlayerController>();
+                Il2CppLast.Map.FieldPlayerKeyAirshipController airshipController = null;
+
+                foreach (var controller in allControllers)
+                {
+                    if (controller != null && controller.gameObject != null && controller.gameObject.activeInHierarchy)
+                    {
+                        var asAirship = controller.TryCast<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                        if (asAirship != null && asAirship.InputEnable)
+                        {
+                            airshipController = asAirship;
+                            break;
+                        }
+                    }
+                }
+
                 if (airshipController == null || airshipController.fieldPlayer == null)
                 {
                     SpeakText("Not on airship");

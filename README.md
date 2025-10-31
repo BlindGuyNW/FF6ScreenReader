@@ -21,7 +21,7 @@ This is a mod for the Pixel Remaster version of Final Fantasy VI. You can find t
 - Final Fantasy VI (Pixel Remaster) on Steam
 - [MelonLoader](https://melonwiki.xyz) (nightly build recommended)
 - [Tolk.dll](https://github.com/dkager/tolk/releases) for screen reader support
-- Active screen reader (NVDA, JAWS, or any SAPI-compatible screen reader)
+- Active screen reader (NVDA, JAWS, or SAPI-compatible voices, though NVDA is most tested)
 
 ### Installation Steps
 
@@ -43,13 +43,13 @@ When exploring the game world, the following hotkeys are available:
 
 - **Left Bracket `[`**: Cycle to previous entity (NPC, treasure, exit, etc.)
 - **Right Bracket `]`**: Cycle to next entity
-- **Backslash `\`**: Repeat currently-selected entity and announce path to reach it
-  - If you hear "no path", the entity is not currently reachable
+- **Backslash `\`**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
   - Navigate along the announced path using arrow keys or controller D-pad
-- **Ctrl+Enter**: Auto-navigate to the selected entity using pathfinding (teleports one tile south of target)
-- **H**: Announce health (HP/MP) for the currently-selected character in battle
+- **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
+- **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
 - **G**: Announce current gil (money)
 - **M**: Announce current map name (useful for orientation)
+- **0, dash, equals**: Change entity category for bracket keys. Use **0** to return to listing all of them.
 
 ### Menu Navigation
 
@@ -64,9 +64,10 @@ The system works in tandem with the game's built-in menus. When you open menus (
 
 ## Known Issues
 
-- Entity names on the field map are sometimes generic or unclear (working on improvements)
+- Entity names on the field map are often generic or unclear (working on improvements. If you have access to Japanese translation i'ts a little better.)
 - Some configuration and character customization menus may not be fully accessible yet
-- Pathfinding occasionally suggests paths that aren't available due to gameplay restrictions
+- Pathfinding occasionally suggests paths that aren't available due to gameplay restrictions, or says they aren't available when they are.
+- Limited testing beyond the opera minigame.
 
 ## Version
 
@@ -75,9 +76,11 @@ This is an early work-in-progress release. It has rough edges but is playable. T
 ## Feedback
 
 Please report issues or ask questions on the [GitHub Issues page](https://github.com/BlindGuyNW/FF6ScreenReader/issues).
+Join the [Discord Server](https://discord.gg/68MVahtsyn).
 
 ## Credits
 
 - Built with [MelonLoader](https://melonwiki.xyz)
 - Uses [Tolk](https://github.com/dkager/tolk) for screen reader integration
 - Game by Square Enix
+- Thanks to Claude Code for assistance with implementation.
