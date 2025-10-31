@@ -55,7 +55,7 @@ namespace FFVI_ScreenReader.Utils
                     // Thread-safe: ensure only one Tolk call at a time to prevent native crashes
                     lock (tolkLock)
                     {
-                        tolk.Output(text, false);
+                        tolk.Output(text, true);
                     }
                 }
             }
