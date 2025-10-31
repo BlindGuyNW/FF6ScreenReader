@@ -5,7 +5,7 @@ using UnityEngine;
 using Il2Cpp;
 using Il2CppLast.Map;
 
-[assembly: MelonInfo(typeof(FFVI_ScreenReader.Core.FFVI_ScreenReaderMod), "FFVI Screen Reader", "1.0.0", "YourName")]
+[assembly: MelonInfo(typeof(FFVI_ScreenReader.Core.FFVI_ScreenReaderMod), "FFVI Screen Reader", "1.0.0", "Zachary Kline")]
 [assembly: MelonGame("SQUARE ENIX, Inc.", "FINAL FANTASY VI")]
 
 namespace FFVI_ScreenReader.Core
