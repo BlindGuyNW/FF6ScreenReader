@@ -38,9 +38,23 @@ namespace FFVI_ScreenReader.Core
         private int currentEntityIndex = 0;
         private EntityCategory currentCategory = EntityCategory.All;
 
+        // Pathfinding filter toggle
+        private bool filterByPathfinding = false;
+
+        // Preferences
+        private static MelonPreferences_Category prefsCategory;
+        private static MelonPreferences_Entry<bool> prefPathfindingFilter;
+
         public override void OnInitializeMelon()
         {
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
+
+            // Initialize preferences
+            prefsCategory = MelonPreferences.CreateCategory("FFVI_ScreenReader");
+            prefPathfindingFilter = prefsCategory.CreateEntry<bool>("PathfindingFilter", false, "Pathfinding Filter", "Only show entities with valid paths when cycling");
+
+            // Load saved preference
+            filterByPathfinding = prefPathfindingFilter.Value;
 
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
@@ -170,6 +184,12 @@ namespace FFVI_ScreenReader.Core
             {
                 ResetToAllCategory();
             }
+
+            // Hotkey: P to toggle pathfinding filter
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P))
+            {
+                TogglePathfindingFilter();
+            }
         }
 
         private void RescanEntities()
@@ -276,8 +296,32 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
-            currentEntityIndex = (currentEntityIndex + 1) % cachedEntities.Count;
-            AnnounceEntityOnly();
+            int startIndex = currentEntityIndex;
+            int attempts = 0;
+            int maxAttempts = cachedEntities.Count;
+
+            do
+            {
+                currentEntityIndex = (currentEntityIndex + 1) % cachedEntities.Count;
+                attempts++;
+
+                // If pathfinding filter is OFF, or if we found a pathable entity, stop
+                if (!filterByPathfinding || HasValidPath(currentEntityIndex))
+                {
+                    AnnounceEntityOnly();
+                    return;
+                }
+
+                // Prevent infinite loop - if we've checked all entities
+                if (attempts >= maxAttempts)
+                {
+                    // Restore original index and announce no pathable entities
+                    currentEntityIndex = startIndex;
+                    SpeakText("No pathable entities found");
+                    return;
+                }
+            }
+            while (true);
         }
 
         private void CyclePrevious()
@@ -288,11 +332,35 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
-            currentEntityIndex--;
-            if (currentEntityIndex < 0)
-                currentEntityIndex = cachedEntities.Count - 1;
+            int startIndex = currentEntityIndex;
+            int attempts = 0;
+            int maxAttempts = cachedEntities.Count;
 
-            AnnounceEntityOnly();
+            do
+            {
+                currentEntityIndex--;
+                if (currentEntityIndex < 0)
+                    currentEntityIndex = cachedEntities.Count - 1;
+
+                attempts++;
+
+                // If pathfinding filter is OFF, or if we found a pathable entity, stop
+                if (!filterByPathfinding || HasValidPath(currentEntityIndex))
+                {
+                    AnnounceEntityOnly();
+                    return;
+                }
+
+                // Prevent infinite loop - if we've checked all entities
+                if (attempts >= maxAttempts)
+                {
+                    // Restore original index and announce no pathable entities
+                    currentEntityIndex = startIndex;
+                    SpeakText("No pathable entities found");
+                    return;
+                }
+            }
+            while (true);
         }
 
         private void AnnounceEntityOnly()
@@ -389,6 +457,50 @@ namespace FFVI_ScreenReader.Core
 
             // Announce category change
             AnnounceCategoryChange();
+        }
+
+        private void TogglePathfindingFilter()
+        {
+            filterByPathfinding = !filterByPathfinding;
+
+            // Save to preferences
+            prefPathfindingFilter.Value = filterByPathfinding;
+            prefsCategory.SaveToFile(false);
+
+            string status = filterByPathfinding ? "on" : "off";
+            SpeakText($"Pathfinding filter {status}");
+
+            // Reset to first entity when toggling
+            currentEntityIndex = 0;
+        }
+
+        private bool HasValidPath(int entityIndex)
+        {
+            if (entityIndex < 0 || entityIndex >= cachedEntities.Count)
+                return false;
+
+            var entityInfo = cachedEntities[entityIndex];
+
+            // Validate entity is still active
+            if (!IsEntityValid(entityInfo))
+                return false;
+
+            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
+            if (playerController?.fieldPlayer == null)
+                return false;
+
+            // Use localPosition for pathfinding (see CLAUDE.md)
+            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
+            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
+
+            var pathInfo = Field.FieldNavigationHelper.FindPathTo(
+                playerPos,
+                targetPos,
+                playerController.mapHandle,
+                playerController.fieldPlayer
+            );
+
+            return pathInfo.Success;
         }
 
         private void AnnounceCategoryChange()

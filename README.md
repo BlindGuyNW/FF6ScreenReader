@@ -43,6 +43,7 @@ When exploring the game world, the following hotkeys are available:
 
 - **Left Bracket `[`**: Cycle to previous entity (NPC, treasure, exit, etc.)
 - **Right Bracket `]`**: Cycle to next entity
+- **P**: Toggle pathfinding filter (when ON, `[` and `]` only show entities with valid paths)
 - **Backslash `\`**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
   - Navigate along the announced path using arrow keys or controller D-pad
 - **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
