@@ -260,9 +260,9 @@ namespace FFVI_ScreenReader.Field
 
                 // Filter: Skip non-interactive types (visual/effect entities, area constraints, hazards)
                 // NOTE: Vehicles come from NeedInteractiveList(), not from entityList, so safe to filter these
+                // NOTE: AnimEntity removed from filter - some animated objects (like letters) are interactive
                 if (info.ObjectType == Il2Cpp.MapConstants.ObjectType.PointIn ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.CollisionEntity ||
-                    info.ObjectType == Il2Cpp.MapConstants.ObjectType.AnimEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.EffectEntity ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.ScreenEffect ||
                     info.ObjectType == Il2Cpp.MapConstants.ObjectType.TileAnimation ||
