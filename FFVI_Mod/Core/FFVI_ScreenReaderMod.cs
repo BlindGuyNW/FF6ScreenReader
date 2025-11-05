@@ -41,6 +41,9 @@ namespace FFVI_ScreenReader.Core
         // Pathfinding filter toggle
         private bool filterByPathfinding = false;
 
+        // Map transition tracking
+        private int lastAnnouncedMapId = -1;
+
         // Preferences
         private static MelonPreferences_Category prefsCategory;
         private static MelonPreferences_Entry<bool> prefPathfindingFilter;
@@ -74,6 +77,32 @@ namespace FFVI_ScreenReader.Core
             {
                 lastEntityScanTime = Time.time;
                 RescanEntities();
+            }
+
+            // Check for map transitions
+            try
+            {
+                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
+                if (userDataManager != null)
+                {
+                    int currentMapId = userDataManager.CurrentMapId;
+                    if (currentMapId != lastAnnouncedMapId && lastAnnouncedMapId != -1)
+                    {
+                        // Map has changed, announce the new map
+                        string mapName = Field.MapNameResolver.GetCurrentMapName();
+                        SpeakText($"Entering {mapName}", interrupt: false);
+                        lastAnnouncedMapId = currentMapId;
+                    }
+                    else if (lastAnnouncedMapId == -1)
+                    {
+                        // First run, just store the current map without announcing
+                        lastAnnouncedMapId = currentMapId;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                LoggerInstance.Warning($"Error detecting map transition: {ex.Message}");
             }
 
             // Check if status details screen is active to route J/L keys appropriately
