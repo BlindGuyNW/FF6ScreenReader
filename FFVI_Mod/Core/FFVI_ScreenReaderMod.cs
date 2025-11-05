@@ -113,14 +113,14 @@ namespace FFVI_ScreenReader.Core
 
             if (statusScreenActive)
             {
-                // On status screen: J announces physical stats, L announces magical stats
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J))
+                // On status screen: J/[ announces physical stats, L/] announces magical stats
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
                 {
                     string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
                     SpeakText(physicalStats);
                 }
 
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L))
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
                 {
                     string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
                     SpeakText(magicalStats);
@@ -128,19 +128,19 @@ namespace FFVI_ScreenReader.Core
             }
             else
             {
-                // On field: J/L/K/P handle entity navigation
+                // On field: J/L/K/P (and legacy [/]/\) handle entity navigation
 
-                // Hotkey: J to cycle backwards
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J))
+                // Hotkey: J or [ to cycle backwards
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
                 {
-                    // Check for Shift+J (cycle categories backward)
+                    // Check for Shift+J/[ (cycle categories backward)
                     if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
                     {
                         CyclePreviousCategory();
                     }
                     else
                     {
-                        // Just J (cycle entities backward)
+                        // Just J/[ (cycle entities backward)
                         CyclePrevious();
                     }
                 }
@@ -151,32 +151,32 @@ namespace FFVI_ScreenReader.Core
                     AnnounceEntityOnly();
                 }
 
-                // Hotkey: L to cycle forwards
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L))
+                // Hotkey: L or ] to cycle forwards
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
                 {
-                    // Check for Shift+L (cycle categories forward)
+                    // Check for Shift+L/] (cycle categories forward)
                     if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
                     {
                         CycleNextCategory();
                     }
                     else
                     {
-                        // Just L (cycle entities forward)
+                        // Just L/] (cycle entities forward)
                         CycleNext();
                     }
                 }
 
-                // Hotkey: P to pathfind to current entity
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P))
+                // Hotkey: P or \ to pathfind to current entity
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Backslash))
                 {
-                    // Check for Shift+P (toggle pathfinding filter)
+                    // Check for Shift+P/\ (toggle pathfinding filter)
                     if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
                     {
                         TogglePathfindingFilter();
                     }
                     else
                     {
-                        // Just P (pathfind to current entity)
+                        // Just P/\ (pathfind to current entity)
                         AnnounceCurrentEntity();
                     }
                 }
@@ -232,10 +232,28 @@ namespace FFVI_ScreenReader.Core
                 AnnounceCurrentMap();
             }
 
-            // Hotkey: 0 (Alpha0) to reset to All category
+            // Hotkey: 0 (Alpha0) or Shift+K to reset to All category
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha0))
             {
                 ResetToAllCategory();
+            }
+
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.K) &&
+                (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift)))
+            {
+                ResetToAllCategory();
+            }
+
+            // Hotkey: = (Equals) or Shift+L/] to cycle to next category
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Equals))
+            {
+                CycleNextCategory();
+            }
+
+            // Hotkey: - (Minus) or Shift+J/[ to cycle to previous category
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Minus))
+            {
+                CyclePreviousCategory();
             }
 
             // Hotkey: T to announce active timers

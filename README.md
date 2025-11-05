@@ -41,15 +41,15 @@ Launch Final Fantasy VI and wait for MelonLoader to build required DLLs. This ma
 
 When exploring the game world, the following hotkeys are available:
 
-- **J**: Cycle to previous entity (NPC, treasure, exit, etc.)
+- **J** or **[**: Cycle to previous entity (NPC, treasure, exit, etc.)
 - **K**: Repeat current entity announcement (without moving selection)
-- **L**: Cycle to next entity
-- **P**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
+- **L** or **]**: Cycle to next entity
+- **P** or **\**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
   - Navigate along the announced path using arrow keys or controller D-pad
-- **Shift+J**: Cycle to previous category (Chests, NPCs, Map Exits, Events, Vehicles)
-- **Shift+L**: Cycle to next category
-- **Shift+P**: Toggle pathfinding filter (when ON, J and L only show entities with valid paths)
-- **0**: Reset to "All" category (show all entity types)
+- **Shift+J**, **Shift+[**, or **-**: Cycle to previous category (Chests, NPCs, Map Exits, Events, Vehicles)
+- **Shift+L**, **Shift+]**, or **=**: Cycle to next category
+- **Shift+P** or **Shift+\**: Toggle pathfinding filter (when ON, J/L or [/] only show entities with valid paths)
+- **0** or **Shift+K**: Reset to "All" category (show all entity types)
 - **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
 - **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
 - **G**: Announce current gil (money)
@@ -61,8 +61,8 @@ When exploring the game world, the following hotkeys are available:
 
 When viewing character status details (from the main menu):
 
-- **J**: Announce physical stats (Strength, Vigor, Speed, Stamina)
-- **L**: Announce magical stats (Magic Power, Magic Defense)
+- **J** or **[**: Announce physical stats (Strength, Vigor, Speed, Stamina)
+- **L** or **]**: Announce magical stats (Magic Power, Magic Defense)
 
 ### Menu Navigation
 
