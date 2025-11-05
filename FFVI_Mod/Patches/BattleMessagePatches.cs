@@ -529,19 +529,19 @@ namespace FFVI_ScreenReader.Patches
                     }
                 }
 
-                // Get condition name from ID - try to access from the unit's CurrentConditionList
-                string conditionName = "Unknown status";
+                // Get condition name from ID - look up from ConfirmedConditionList (includes equipment statuses)
+                string conditionName = null;
                 try
                 {
-                    // Try to find the newly added condition in the parameter's condition list
                     var unitDataInfo = battleUnitData.BattleUnitDataInfo;
                     if (unitDataInfo != null && unitDataInfo.Parameter != null)
                     {
                         var param = unitDataInfo.Parameter;
-                        if (param.CurrentConditionList != null && param.CurrentConditionList.Count > 0)
+                        var confirmedList = param.ConfirmedConditionList();
+                        if (confirmedList != null && confirmedList.Count > 0)
                         {
                             // Look for a condition matching our ID
-                            foreach (var condition in param.CurrentConditionList)
+                            foreach (var condition in confirmedList)
                             {
                                 if (condition != null && condition.Id == id)
                                 {
@@ -567,10 +567,18 @@ namespace FFVI_ScreenReader.Patches
                             }
                         }
                     }
+
+                    // Final fallback: Announce the raw ID if we couldn't resolve the name
+                    if (conditionName == null)
+                    {
+                        conditionName = $"Status {id}";
+                        MelonLogger.Warning($"[Status] Could not resolve condition ID {id}, announcing as raw ID");
+                    }
                 }
                 catch (Exception condEx)
                 {
                     MelonLogger.Warning($"Error resolving condition ID {id}: {condEx.Message}");
+                    conditionName = $"Status {id}";
                 }
 
                 string announcement = $"{targetName}: {conditionName}";
