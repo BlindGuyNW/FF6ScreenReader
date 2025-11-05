@@ -190,6 +190,21 @@ namespace FFVI_ScreenReader.Core
             {
                 TogglePathfindingFilter();
             }
+
+            // Hotkey: T to announce active timers
+            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.T))
+            {
+                // Check for Shift+T (freeze/resume timers)
+                if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
+                {
+                    Patches.TimerHelper.ToggleTimerFreeze();
+                }
+                else
+                {
+                    // Just T (announce timers)
+                    Patches.TimerHelper.AnnounceActiveTimers();
+                }
+            }
         }
 
         private void RescanEntities()

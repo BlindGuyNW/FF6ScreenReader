@@ -49,6 +49,8 @@ When exploring the game world, the following hotkeys are available:
 - **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
 - **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
 - **G**: Announce current gil (money)
+- **T**: Announce remaining time on active countdown timers (useful during timed sequences)
+- **Shift+T**: Freeze/resume countdown timers (removes time pressure during timed events for accessibility)
 - **M**: Announce current map name (useful for orientation)
 - **0, dash, equals**: Change entity category for bracket keys. Use **0** to return to listing all of them.
 
