@@ -41,18 +41,28 @@ Launch Final Fantasy VI and wait for MelonLoader to build required DLLs. This ma
 
 When exploring the game world, the following hotkeys are available:
 
-- **Left Bracket `[`**: Cycle to previous entity (NPC, treasure, exit, etc.)
-- **Right Bracket `]`**: Cycle to next entity
-- **P**: Toggle pathfinding filter (when ON, `[` and `]` only show entities with valid paths)
-- **Backslash `\`**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
+- **J**: Cycle to previous entity (NPC, treasure, exit, etc.)
+- **K**: Repeat current entity announcement (without moving selection)
+- **L**: Cycle to next entity
+- **P**: Announce path to current entity. If you hear "no path", the entity is not currently reachable
   - Navigate along the announced path using arrow keys or controller D-pad
+- **Shift+J**: Cycle to previous category (Chests, NPCs, Map Exits, Events, Vehicles)
+- **Shift+L**: Cycle to next category
+- **Shift+P**: Toggle pathfinding filter (when ON, J and L only show entities with valid paths)
+- **0**: Reset to "All" category (show all entity types)
 - **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
 - **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
 - **G**: Announce current gil (money)
 - **T**: Announce remaining time on active countdown timers (useful during timed sequences)
 - **Shift+T**: Freeze/resume countdown timers (removes time pressure during timed events for accessibility)
 - **M**: Announce current map name (useful for orientation)
-- **0, dash, equals**: Change entity category for bracket keys. Use **0** to return to listing all of them.
+
+### Status Screen Hotkeys
+
+When viewing character status details (from the main menu):
+
+- **J**: Announce physical stats (Strength, Vigor, Speed, Stamina)
+- **L**: Announce magical stats (Magic Power, Magic Defense)
 
 ### Menu Navigation
 

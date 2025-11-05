@@ -76,13 +76,7 @@ namespace FFVI_ScreenReader.Core
                 RescanEntities();
             }
 
-            // Hotkey: Backslash to announce current entity
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Backslash))
-            {
-                AnnounceCurrentEntity();
-            }
-
-            // Check if status details screen is active to route bracket keys appropriately
+            // Check if status details screen is active to route J/L keys appropriately
             var statusController = UnityEngine.Object.FindObjectOfType<Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController>();
             bool statusScreenActive = statusController != null &&
                                      statusController.gameObject != null &&
@@ -90,14 +84,14 @@ namespace FFVI_ScreenReader.Core
 
             if (statusScreenActive)
             {
-                // On status screen: bracket keys announce stats
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
+                // On status screen: J announces physical stats, L announces magical stats
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J))
                 {
                     string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
                     SpeakText(physicalStats);
                 }
 
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L))
                 {
                     string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
                     SpeakText(magicalStats);
@@ -105,15 +99,57 @@ namespace FFVI_ScreenReader.Core
             }
             else
             {
-                // On field: bracket keys cycle entities
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
+                // On field: J/L/K/P handle entity navigation
+
+                // Hotkey: J to cycle backwards
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J))
                 {
-                    CycleNext();
+                    // Check for Shift+J (cycle categories backward)
+                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
+                    {
+                        CyclePreviousCategory();
+                    }
+                    else
+                    {
+                        // Just J (cycle entities backward)
+                        CyclePrevious();
+                    }
                 }
 
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
+                // Hotkey: K to repeat current entity
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.K))
                 {
-                    CyclePrevious();
+                    AnnounceEntityOnly();
+                }
+
+                // Hotkey: L to cycle forwards
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L))
+                {
+                    // Check for Shift+L (cycle categories forward)
+                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
+                    {
+                        CycleNextCategory();
+                    }
+                    else
+                    {
+                        // Just L (cycle entities forward)
+                        CycleNext();
+                    }
+                }
+
+                // Hotkey: P to pathfind to current entity
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P))
+                {
+                    // Check for Shift+P (toggle pathfinding filter)
+                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
+                    {
+                        TogglePathfindingFilter();
+                    }
+                    else
+                    {
+                        // Just P (pathfind to current entity)
+                        AnnounceCurrentEntity();
+                    }
                 }
             }
 
@@ -167,28 +203,10 @@ namespace FFVI_ScreenReader.Core
                 AnnounceCurrentMap();
             }
 
-            // Hotkey: = (Equals) to cycle to next category
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Equals))
-            {
-                CycleNextCategory();
-            }
-
-            // Hotkey: - (Minus) to cycle to previous category
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Minus))
-            {
-                CyclePreviousCategory();
-            }
-
             // Hotkey: 0 (Alpha0) to reset to All category
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha0))
             {
                 ResetToAllCategory();
-            }
-
-            // Hotkey: P to toggle pathfinding filter
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P))
-            {
-                TogglePathfindingFilter();
             }
 
             // Hotkey: T to announce active timers
