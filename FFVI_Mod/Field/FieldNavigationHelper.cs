@@ -413,6 +413,9 @@ namespace FFVI_ScreenReader.Field
             // De-duplicate entities at the same position
             results = DeduplicateByPosition(results);
 
+            // De-duplicate map exits by destination (keep only closest exit per destination)
+            results = DeduplicateMapExitsByDestination(results);
+
             // Filter out doors/triggers that are immediately before map exits
             results = FilterDoorBeforeMapExit(results, playerPos);
 
@@ -465,6 +468,81 @@ namespace FFVI_ScreenReader.Field
             }
 
             return deduplicated;
+        }
+
+        /// <summary>
+        /// De-duplicates map exits that lead to the same destination, keeping only the closest exit to the player.
+        /// This prevents cluttering the scan list with multiple exit tiles that lead to the same map.
+        /// </summary>
+        private static List<EntityInfo> DeduplicateMapExitsByDestination(List<EntityInfo> entities)
+        {
+            // Separate map exits from other entities
+            var mapExits = new List<EntityInfo>();
+            var nonExits = new List<EntityInfo>();
+
+            foreach (var entity in entities)
+            {
+                if (entity.ObjectType == Il2Cpp.MapConstants.ObjectType.GotoMap)
+                {
+                    mapExits.Add(entity);
+                }
+                else
+                {
+                    nonExits.Add(entity);
+                }
+            }
+
+            // If no map exits or only one, no deduplication needed
+            if (mapExits.Count <= 1)
+                return entities;
+
+            // Group map exits by destination MapId
+            var exitsByDestination = new Dictionary<int, List<EntityInfo>>();
+
+            foreach (var exit in mapExits)
+            {
+                // Get the destination map ID
+                int destinationMapId = -1;
+                if (exit.Entity?.Property != null)
+                {
+                    var gotoMapProperty = exit.Entity.Property.TryCast<Il2CppLast.Map.PropertyGotoMap>();
+                    if (gotoMapProperty != null)
+                    {
+                        destinationMapId = gotoMapProperty.MapId;
+                    }
+                }
+
+                // Group by destination (use -1 for unknown destinations)
+                if (!exitsByDestination.ContainsKey(destinationMapId))
+                {
+                    exitsByDestination[destinationMapId] = new List<EntityInfo>();
+                }
+                exitsByDestination[destinationMapId].Add(exit);
+            }
+
+            // For each destination, keep only the closest exit
+            var filteredExits = new List<EntityInfo>();
+            foreach (var group in exitsByDestination.Values)
+            {
+                if (group.Count == 1)
+                {
+                    // Only one exit to this destination, keep it
+                    filteredExits.Add(group[0]);
+                }
+                else
+                {
+                    // Multiple exits to same destination - keep the closest one
+                    group.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+                    filteredExits.Add(group[0]);
+                }
+            }
+
+            // Combine filtered exits with non-exit entities
+            var result = new List<EntityInfo>();
+            result.AddRange(nonExits);
+            result.AddRange(filteredExits);
+
+            return result;
         }
 
         /// <summary>
