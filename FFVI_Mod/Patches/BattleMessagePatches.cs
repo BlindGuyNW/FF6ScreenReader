@@ -797,6 +797,40 @@ namespace FFVI_ScreenReader.Patches
                                     int maxMP = unitDataInfo.Parameter.ConfirmedMaxMp();
 
                                     announcement += $", HP {currentHP}/{maxHP}, MP {currentMP}/{maxMP}";
+
+                                    // Get status conditions
+                                    var conditionList = unitDataInfo.Parameter.ConfirmedConditionList();
+                                    if (conditionList != null && conditionList.Count > 0)
+                                    {
+                                        var messageManager = MessageManager.Instance;
+                                        if (messageManager != null)
+                                        {
+                                            var statusNames = new System.Collections.Generic.List<string>();
+
+                                            foreach (var condition in conditionList)
+                                            {
+                                                if (condition != null)
+                                                {
+                                                    string conditionMesId = condition.MesIdName;
+
+                                                    // Skip conditions with no message ID (internal/hidden statuses)
+                                                    if (!string.IsNullOrEmpty(conditionMesId) && conditionMesId != "None")
+                                                    {
+                                                        string localizedConditionName = messageManager.GetMessage(conditionMesId);
+                                                        if (!string.IsNullOrEmpty(localizedConditionName))
+                                                        {
+                                                            statusNames.Add(localizedConditionName);
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if (statusNames.Count > 0)
+                                            {
+                                                announcement += $", {string.Join(", ", statusNames)}";
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             catch (Exception ex)

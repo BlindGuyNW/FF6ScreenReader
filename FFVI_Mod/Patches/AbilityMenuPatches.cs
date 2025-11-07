@@ -1052,7 +1052,7 @@ namespace FFVI_ScreenReader.Patches
 
                                 if (statusNames.Count > 0)
                                 {
-                                    announcement += $", Status: {string.Join(", ", statusNames)}";
+                                    announcement += $", {string.Join(", ", statusNames)}";
                                 }
                             }
                         }

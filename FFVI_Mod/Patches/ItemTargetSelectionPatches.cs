@@ -3,6 +3,8 @@ using HarmonyLib;
 using MelonLoader;
 using Il2CppLast.UI.KeyInput;
 using Il2CppLast.UI;
+using Il2CppLast.Management;
+using Il2CppLast.Data.Master;
 using FFVI_ScreenReader.Core;
 
 namespace FFVI_ScreenReader.Patches
@@ -70,6 +72,40 @@ namespace FFVI_ScreenReader.Patches
                         int maxMP = parameter.ConfirmedMaxMp();
 
                         announcement += $", HP {currentHP}/{maxHP}, MP {currentMP}/{maxMP}";
+
+                        // Get status conditions
+                        var conditionList = parameter.ConfirmedConditionList();
+                        if (conditionList != null && conditionList.Count > 0)
+                        {
+                            var messageManager = MessageManager.Instance;
+                            if (messageManager != null)
+                            {
+                                var statusNames = new System.Collections.Generic.List<string>();
+
+                                foreach (var condition in conditionList)
+                                {
+                                    if (condition != null)
+                                    {
+                                        string conditionMesId = condition.MesIdName;
+
+                                        // Skip conditions with no message ID (internal/hidden statuses)
+                                        if (!string.IsNullOrEmpty(conditionMesId) && conditionMesId != "None")
+                                        {
+                                            string localizedConditionName = messageManager.GetMessage(conditionMesId);
+                                            if (!string.IsNullOrEmpty(localizedConditionName))
+                                            {
+                                                statusNames.Add(localizedConditionName);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (statusNames.Count > 0)
+                                {
+                                    announcement += $", {string.Join(", ", statusNames)}";
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
