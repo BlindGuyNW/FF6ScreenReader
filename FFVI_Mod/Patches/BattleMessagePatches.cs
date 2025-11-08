@@ -601,9 +601,14 @@ namespace FFVI_ScreenReader.Patches
     }
 
     // Patch BattleMenuController from KeyInput namespace - command messages like "Terra uses Fire"
+    // Also handles Libra/Scan spell results which call this method repeatedly with the same text
     [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.BattleMenuController), nameof(Il2CppLast.UI.KeyInput.BattleMenuController.SetCommadnMessage))]
     public static class BattleMenuController_KeyInput_SetCommadnMessage_Patch
     {
+        private static string lastMessage = "";
+        private static float lastMessageTime = 0f;
+        private const float MESSAGE_THROTTLE_SECONDS = 2.5f; // Only announce if message changes or 2.5 seconds has passed
+
         [HarmonyPostfix]
         public static void Postfix(string message, bool isLeft)
         {
@@ -611,11 +616,31 @@ namespace FFVI_ScreenReader.Patches
             {
                 if (string.IsNullOrWhiteSpace(message))
                 {
+                    // If message is cleared, reset tracking
+                    if (!string.IsNullOrWhiteSpace(lastMessage))
+                    {
+                        lastMessage = "";
+                        lastMessageTime = 0f;
+                    }
                     return;
                 }
 
                 // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
                 string cleanMessage = string.Copy(message.Trim());
+
+                // Get current time
+                float currentTime = UnityEngine.Time.time;
+
+                // Skip if this is the same message within the throttle window
+                // This prevents Libra/Scan results from being announced 40+ times
+                if (cleanMessage == lastMessage && (currentTime - lastMessageTime) < MESSAGE_THROTTLE_SECONDS)
+                {
+                    return;
+                }
+
+                // This is either a new message or enough time has passed
+                lastMessage = cleanMessage;
+                lastMessageTime = currentTime;
 
                 MelonLogger.Msg($"[Battle Command] {cleanMessage}");
                 FFVI_ScreenReaderMod.SpeakText(cleanMessage, interrupt: false);
