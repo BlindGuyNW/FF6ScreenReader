@@ -41,12 +41,16 @@ namespace FFVI_ScreenReader.Core
         // Pathfinding filter toggle
         private bool filterByPathfinding = false;
 
+        // Map exit filter toggle
+        private bool filterMapExits = false;
+
         // Map transition tracking
         private int lastAnnouncedMapId = -1;
 
         // Preferences
         private static MelonPreferences_Category prefsCategory;
         private static MelonPreferences_Entry<bool> prefPathfindingFilter;
+        private static MelonPreferences_Entry<bool> prefMapExitFilter;
 
         public override void OnInitializeMelon()
         {
@@ -55,9 +59,11 @@ namespace FFVI_ScreenReader.Core
             // Initialize preferences
             prefsCategory = MelonPreferences.CreateCategory("FFVI_ScreenReader");
             prefPathfindingFilter = prefsCategory.CreateEntry<bool>("PathfindingFilter", false, "Pathfinding Filter", "Only show entities with valid paths when cycling");
+            prefMapExitFilter = prefsCategory.CreateEntry<bool>("MapExitFilter", false, "Map Exit Filter", "Filter multiple map exits to the same destination, showing only the closest one");
 
-            // Load saved preference
+            // Load saved preferences
             filterByPathfinding = prefPathfindingFilter.Value;
+            filterMapExits = prefMapExitFilter.Value;
 
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
@@ -229,7 +235,16 @@ namespace FFVI_ScreenReader.Core
             // Hotkey: M to announce current map name
             if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.M))
             {
-                AnnounceCurrentMap();
+                // Check for Shift+M (toggle map exit filter)
+                if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
+                {
+                    ToggleMapExitFilter();
+                }
+                else
+                {
+                    // Just M (announce current map)
+                    AnnounceCurrentMap();
+                }
             }
 
             // Hotkey: 0 (Alpha0) or Shift+K to reset to All category
@@ -291,7 +306,7 @@ namespace FFVI_ScreenReader.Core
             }
 
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
-            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f, currentCategory);
+            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f, currentCategory, filterMapExits);
 
             // Try to find the same entity in the new list (by position)
             if (previousEntity != null)
@@ -552,6 +567,21 @@ namespace FFVI_ScreenReader.Core
 
             // Reset to first entity when toggling
             currentEntityIndex = 0;
+        }
+
+        private void ToggleMapExitFilter()
+        {
+            filterMapExits = !filterMapExits;
+
+            // Save to preferences
+            prefMapExitFilter.Value = filterMapExits;
+            prefsCategory.SaveToFile(false);
+
+            string status = filterMapExits ? "on" : "off";
+            SpeakText($"Map exit filter {status}");
+
+            // Rescan entities to apply the new filter
+            RescanEntities();
         }
 
         private bool HasValidPath(int entityIndex)

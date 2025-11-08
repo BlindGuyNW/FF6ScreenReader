@@ -197,13 +197,13 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance = 100f)
         {
-            return GetNearbyEntities(playerPos, maxDistance, FFVI_ScreenReader.Core.EntityCategory.All);
+            return GetNearbyEntities(playerPos, maxDistance, FFVI_ScreenReader.Core.EntityCategory.All, false);
         }
 
         /// <summary>
         /// Gets information about nearby entities filtered by category
         /// </summary>
-        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance, FFVI_ScreenReader.Core.EntityCategory category)
+        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance, FFVI_ScreenReader.Core.EntityCategory category, bool filterMapExits = false)
         {
             var results = new List<EntityInfo>();
 
@@ -413,8 +413,11 @@ namespace FFVI_ScreenReader.Field
             // De-duplicate entities at the same position
             results = DeduplicateByPosition(results);
 
-            // De-duplicate map exits by destination (keep only closest exit per destination)
-            results = DeduplicateMapExitsByDestination(results);
+            // De-duplicate map exits by destination (keep only closest exit per destination) if filter is enabled
+            if (filterMapExits)
+            {
+                results = DeduplicateMapExitsByDestination(results);
+            }
 
             // Filter out doors/triggers that are immediately before map exits
             results = FilterDoorBeforeMapExit(results, playerPos);

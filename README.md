@@ -56,6 +56,7 @@ When exploring the game world, the following hotkeys are available:
 - **T**: Announce remaining time on active countdown timers (useful during timed sequences)
 - **Shift+T**: Freeze/resume countdown timers (removes time pressure during timed events for accessibility)
 - **M**: Announce current map name (useful for orientation)
+- **Shift+M**: Toggle map exit filter (when ON, only shows the closest exit for each destination; when OFF, shows all exits)
 
 ### Status Screen Hotkeys
 
