@@ -188,11 +188,26 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // Hotkey: Ctrl+Enter to teleport to currently selected entity
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) &&
-                (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl)))
+            // Hotkey: Ctrl+Arrow to teleport in the direction of the arrow
+            bool ctrlHeld = UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl);
+            if (ctrlHeld)
             {
-                TeleportToCurrentEntity();
+                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.UpArrow))
+                {
+                    TeleportInDirection(new Vector2(0, 16)); // North
+                }
+                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.DownArrow))
+                {
+                    TeleportInDirection(new Vector2(0, -16)); // South
+                }
+                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftArrow))
+                {
+                    TeleportInDirection(new Vector2(-16, 0)); // West
+                }
+                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightArrow))
+                {
+                    TeleportInDirection(new Vector2(16, 0)); // East
+                }
             }
 
             // Hotkey: H to announce airship heading (if on airship) or character health (if in battle)
@@ -643,7 +658,7 @@ namespace FFVI_ScreenReader.Core
             }
         }
 
-        private void TeleportToCurrentEntity()
+        private void TeleportInDirection(Vector2 offset)
         {
             if (cachedEntities.Count == 0 || currentEntityIndex < 0 || currentEntityIndex >= cachedEntities.Count)
             {
@@ -670,16 +685,27 @@ namespace FFVI_ScreenReader.Core
 
             var player = playerController.fieldPlayer;
 
-            // Calculate offset position slightly south of the target to avoid overlapping
-            // One cell = 16 units, so moving 16 units south (negative Y)
+            // Calculate offset position relative to the target entity
+            // One cell = 16 units
             Vector3 targetPos = entityInfo.Position;
-            Vector3 offsetPos = new Vector3(targetPos.x, targetPos.y - 16f, targetPos.z);
+            Vector3 newPos = new Vector3(targetPos.x + offset.x, targetPos.y + offset.y, targetPos.z);
 
             // Instantly teleport by setting localPosition directly
-            player.transform.localPosition = offsetPos;
+            player.transform.localPosition = newPos;
 
-            SpeakText($"Teleported south of {entityInfo.Name}");
-            LoggerInstance.Msg($"Teleported to position south of {entityInfo.Name} at {offsetPos}");
+            // Announce direction
+            string direction = GetDirectionName(offset);
+            SpeakText($"Teleported {direction} of {entityInfo.Name}");
+            LoggerInstance.Msg($"Teleported {direction} of {entityInfo.Name} to position {newPos}");
+        }
+
+        private string GetDirectionName(Vector2 offset)
+        {
+            if (offset.y > 0) return "north";
+            if (offset.y < 0) return "south";
+            if (offset.x < 0) return "west";
+            if (offset.x > 0) return "east";
+            return "unknown";
         }
 
         private void AnnounceCurrentCharacterStatus()

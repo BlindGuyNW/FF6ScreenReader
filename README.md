@@ -50,7 +50,7 @@ When exploring the game world, the following hotkeys are available:
 - **Shift+L**, **Shift+]**, or **=**: Cycle to next category
 - **Shift+P** or **Shift+\**: Toggle pathfinding filter (when ON, J/L or [/] only show entities with valid paths)
 - **0** or **Shift+K**: Reset to "All" category (show all entity types)
-- **Ctrl+Enter**: Auto-navigate to the selected entity; (teleports one tile south of target)
+- **Ctrl+Arrow Keys**: Teleport one tile in the direction of the arrow relative to the selected entity (Up=North, Down=South, Left=West, Right=East). First select an entity with J/L, then use Ctrl+arrows to teleport in different directions from that entity
 - **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
 - **G**: Announce current gil (money)
 - **T**: Announce remaining time on active countdown timers (useful during timed sequences)
