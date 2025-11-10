@@ -1008,16 +1008,20 @@ namespace FFVI_ScreenReader.Field
                 direction = GetDirection(currentPlayerPos.Value, info.Position);
             }
 
+            // Convert units to steps (16 units = 1 step)
+            float steps = distance / 16f;
+            string stepLabel = Math.Abs(steps - 1f) < 0.1f ? "step" : "steps";
+
             // Start with name if available
             if (!string.IsNullOrEmpty(info.Name))
             {
-                sb.Append($"{info.Name} ({distance:F1} units {direction})");
+                sb.Append($"{info.Name} ({steps:F1} {stepLabel} {direction})");
             }
             else
             {
                 // If no name, start with type
                 string typeDesc = GetEntityTypeDescription(info);
-                sb.Append($"{typeDesc} ({distance:F1} units {direction})");
+                sb.Append($"{typeDesc} ({steps:F1} {stepLabel} {direction})");
             }
 
             // Add type at the end if name was present
