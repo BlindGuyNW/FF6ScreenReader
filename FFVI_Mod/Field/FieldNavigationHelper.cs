@@ -1013,14 +1013,23 @@ namespace FFVI_ScreenReader.Field
                 direction = GetDirection(currentPlayerPos.Value, info.Position);
             }
 
-            // Main type and distance
-            string typeDesc = GetEntityTypeDescription(info);
-            sb.Append($"{typeDesc} ({distance:F1} units {direction})");
-
-            // Add name if available
+            // Start with name if available
             if (!string.IsNullOrEmpty(info.Name))
             {
-                sb.Append($" - {info.Name}");
+                sb.Append($"{info.Name} ({distance:F1} units {direction})");
+            }
+            else
+            {
+                // If no name, start with type
+                string typeDesc = GetEntityTypeDescription(info);
+                sb.Append($"{typeDesc} ({distance:F1} units {direction})");
+            }
+
+            // Add type at the end if name was present
+            if (!string.IsNullOrEmpty(info.Name))
+            {
+                string typeDesc = GetEntityTypeDescription(info);
+                sb.Append($" - {typeDesc}");
             }
 
             return sb.ToString();
