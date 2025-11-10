@@ -72,7 +72,7 @@ namespace FFVI_ScreenReader.Field
         /// <summary>
         /// Gets information about nearby interactive entities using the game's InteractiveEntityList
         /// </summary>
-        public static List<EntityInfo> GetNearbyInteractiveEntities(Vector3 playerPos, Il2CppSystem.Collections.Generic.List<Il2CppLast.Entity.Field.IInteractiveEntity> interactiveList, float maxDistance = 100f)
+        public static List<EntityInfo> GetNearbyInteractiveEntities(Vector3 playerPos, Il2CppSystem.Collections.Generic.List<Il2CppLast.Entity.Field.IInteractiveEntity> interactiveList)
         {
             var results = new List<EntityInfo>();
 
@@ -88,7 +88,6 @@ namespace FFVI_ScreenReader.Field
 
                 // Calculate distance
                 float distance = Vector3.Distance(playerPos, fieldEntity.transform.position);
-                if (distance > maxDistance) continue;
 
                 // Get entity info
                 var info = new EntityInfo
@@ -195,15 +194,15 @@ namespace FFVI_ScreenReader.Field
         /// <summary>
         /// Gets information about nearby entities using the game's entity list (deprecated - use GetNearbyInteractiveEntities)
         /// </summary>
-        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance = 100f)
+        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos)
         {
-            return GetNearbyEntities(playerPos, maxDistance, FFVI_ScreenReader.Core.EntityCategory.All, false);
+            return GetNearbyEntities(playerPos, FFVI_ScreenReader.Core.EntityCategory.All, false);
         }
 
         /// <summary>
         /// Gets information about nearby entities filtered by category
         /// </summary>
-        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, float maxDistance, FFVI_ScreenReader.Core.EntityCategory category, bool filterMapExits = false)
+        public static List<EntityInfo> GetNearbyEntities(Vector3 playerPos, FFVI_ScreenReader.Core.EntityCategory category, bool filterMapExits = false)
         {
             var results = new List<EntityInfo>();
 
@@ -280,9 +279,6 @@ namespace FFVI_ScreenReader.Field
 
                 // Calculate distance after filtering
                 float distance = Vector3.Distance(playerPos, entity.transform.position);
-
-                // Skip entities too far
-                if (distance > maxDistance) continue;
 
                 info.Distance = distance;
                 // Direction will be calculated when announcing (to avoid log spam and get fresh data)
@@ -383,7 +379,6 @@ namespace FFVI_ScreenReader.Field
 
                         // Calculate distance
                         float distance = Vector3.Distance(playerPos, entity.transform.position);
-                        if (distance > maxDistance) continue;
 
                         // Create entity info
                         var vehicleInfo = new EntityInfo

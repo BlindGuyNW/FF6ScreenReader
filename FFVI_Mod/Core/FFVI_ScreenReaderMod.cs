@@ -321,7 +321,7 @@ namespace FFVI_ScreenReader.Core
             }
 
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
-            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, 1000f, currentCategory, filterMapExits);
+            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, currentCategory, filterMapExits);
 
             // Try to find the same entity in the new list (by position)
             if (previousEntity != null)
