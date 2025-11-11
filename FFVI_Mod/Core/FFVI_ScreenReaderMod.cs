@@ -78,6 +78,22 @@ namespace FFVI_ScreenReader.Core
 
         public override void OnUpdate()
         {
+            // Check if ANY Unity InputField is focused - if so, let all keys pass through
+            try
+            {
+                var inputField = UnityEngine.Object.FindObjectOfType<UnityEngine.UI.InputField>();
+                if (inputField != null && inputField.isFocused)
+                {
+                    // Player is typing text - skip all hotkey processing
+                    return;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // If we can't check input field state, continue with normal hotkey processing
+                LoggerInstance.Warning($"Error checking input field state: {ex.Message}");
+            }
+
             // Periodically rescan entities
             if (Time.time - lastEntityScanTime >= ENTITY_SCAN_INTERVAL)
             {
