@@ -200,6 +200,27 @@ namespace FFVI_ScreenReader.Patches
                     // MP cost not available, continue without it
                 }
 
+                // Try to get learning progress if available
+                try
+                {
+                    if (selectedContent != null)
+                    {
+                        // Check if the ability is still being learned (SkillLevel < 100)
+                        // SkillLevel 100 means already mastered/usable (either innate or fully learned)
+                        int skillLevel = abilityData.SkillLevel;
+                        if (skillLevel < 100 && skillLevel > 0)
+                        {
+                            announcement += $", learning, {skillLevel} percent";
+                        }
+                        // If SkillLevel == 100, don't announce learning progress (already mastered)
+                        // If SkillLevel == 0, the ability hasn't started learning yet
+                    }
+                }
+                catch
+                {
+                    // Learning progress not available, continue without it
+                }
+
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
