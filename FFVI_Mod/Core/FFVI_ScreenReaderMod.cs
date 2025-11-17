@@ -44,6 +44,12 @@ namespace FFVI_ScreenReader.Core
         // Map exit filter toggle
         private bool filterMapExits = false;
 
+        // Pathfinding cache for performance optimization
+        private System.Collections.Generic.Dictionary<string, bool> pathfindingCache = new System.Collections.Generic.Dictionary<string, bool>();
+        private System.Collections.Generic.Queue<EntityInfo> entitiesToScan = new System.Collections.Generic.Queue<EntityInfo>();
+        private System.Collections.Generic.HashSet<string> scannedPositions = new System.Collections.Generic.HashSet<string>();
+        private bool isBackgroundScanRunning = false;
+
         // Map transition tracking
         private int lastAnnouncedMapId = -1;
 
@@ -72,6 +78,13 @@ namespace FFVI_ScreenReader.Core
 
         public override void OnDeinitializeMelon()
         {
+            // Clear pathfinding cache
+            pathfindingCache.Clear();
+            entitiesToScan.Clear();
+            scannedPositions.Clear();
+            isBackgroundScanRunning = false;
+
+            // Cleanup all coroutines and unload Tolk
             CoroutineManager.CleanupAll();
             tolk?.Unload();
         }
@@ -318,6 +331,23 @@ namespace FFVI_ScreenReader.Core
             }
         }
 
+        /// <summary>
+        /// Generates a cache key for an entity based on its position.
+        /// Rounds to 0.1 units for tolerance against floating point precision issues.
+        /// </summary>
+        private string GetEntityCacheKey(EntityInfo entity)
+        {
+            if (entity == null)
+                return null;
+
+            // Round to 0.1 units for consistent keys
+            int x = (int)(entity.Position.x * 10);
+            int y = (int)(entity.Position.y * 10);
+            int z = (int)(entity.Position.z * 10);
+
+            return $"{x},{y},{z}";
+        }
+
         private void RescanEntities()
         {
             var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
@@ -339,6 +369,49 @@ namespace FFVI_ScreenReader.Core
             Vector3 playerPos = playerController.fieldPlayer.transform.position;
             cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, currentCategory, filterMapExits);
 
+            // Manage pathfinding cache if filter is enabled
+            if (filterByPathfinding)
+            {
+                // Build set of current entity positions
+                var currentPositions = new System.Collections.Generic.HashSet<string>();
+                foreach (var entity in cachedEntities)
+                {
+                    string key = GetEntityCacheKey(entity);
+                    if (key != null)
+                    {
+                        currentPositions.Add(key);
+
+                        // If not in cache, add to scan queue (priority: new entities)
+                        if (!pathfindingCache.ContainsKey(key))
+                        {
+                            entitiesToScan.Enqueue(entity);
+                        }
+                    }
+                }
+
+                // Remove stale cache entries (entities that no longer exist)
+                var keysToRemove = new System.Collections.Generic.List<string>();
+                foreach (var key in pathfindingCache.Keys)
+                {
+                    if (!currentPositions.Contains(key))
+                    {
+                        keysToRemove.Add(key);
+                    }
+                }
+                foreach (var key in keysToRemove)
+                {
+                    pathfindingCache.Remove(key);
+                }
+
+                // Start background scanning if there are entities to scan and not already running
+                if (entitiesToScan.Count > 0 && !isBackgroundScanRunning)
+                {
+                    scannedPositions.Clear();
+                    isBackgroundScanRunning = true;
+                    CoroutineManager.StartManaged(BackgroundScanEntities());
+                }
+            }
+
             // Try to find the same entity in the new list (by position)
             if (previousEntity != null)
             {
@@ -356,6 +429,69 @@ namespace FFVI_ScreenReader.Core
             // If not found or no previous entity, reset to 0
             if (currentEntityIndex >= cachedEntities.Count)
                 currentEntityIndex = 0;
+        }
+
+        /// <summary>
+        /// Background coroutine that incrementally scans entities for pathfinding.
+        /// Processes 5-10 entities per frame to avoid lag spikes.
+        /// </summary>
+        private System.Collections.IEnumerator BackgroundScanEntities()
+        {
+            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
+
+            if (playerController?.fieldPlayer == null)
+            {
+                isBackgroundScanRunning = false;
+                yield break;
+            }
+
+            const int ENTITIES_PER_FRAME = 8;
+            int processedThisFrame = 0;
+
+            while (entitiesToScan.Count > 0)
+            {
+                var entity = entitiesToScan.Dequeue();
+
+                // Skip if already scanned this cycle
+                string key = GetEntityCacheKey(entity);
+                if (key == null || scannedPositions.Contains(key))
+                {
+                    continue;
+                }
+
+                // Validate entity is still active
+                if (!IsEntityValid(entity))
+                {
+                    continue;
+                }
+
+                // Run pathfinding using localPosition (see CLAUDE.md)
+                Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
+                Vector3 targetPos = entity.Entity.transform.localPosition;
+
+                var pathInfo = Field.FieldNavigationHelper.FindPathTo(
+                    playerPos,
+                    targetPos,
+                    playerController.mapHandle,
+                    playerController.fieldPlayer
+                );
+
+                // Cache the result
+                pathfindingCache[key] = pathInfo.Success;
+                scannedPositions.Add(key);
+
+                processedThisFrame++;
+
+                // Yield every N entities to spread work across frames
+                if (processedThisFrame >= ENTITIES_PER_FRAME)
+                {
+                    processedThisFrame = 0;
+                    yield return null;
+                }
+            }
+
+            // Scan complete
+            isBackgroundScanRunning = false;
         }
 
         private void AnnounceCurrentEntity()
@@ -593,11 +729,18 @@ namespace FFVI_ScreenReader.Core
             prefPathfindingFilter.Value = filterByPathfinding;
             prefsCategory.SaveToFile(false);
 
+            // Clear cache when toggling
+            pathfindingCache.Clear();
+            entitiesToScan.Clear();
+            scannedPositions.Clear();
+            isBackgroundScanRunning = false;
+
             string status = filterByPathfinding ? "on" : "off";
             SpeakText($"Pathfinding filter {status}");
 
-            // Reset to first entity when toggling
+            // Reset to first entity and trigger rescan to start background validation
             currentEntityIndex = 0;
+            RescanEntities();
         }
 
         private void ToggleMapExitFilter()
@@ -626,6 +769,14 @@ namespace FFVI_ScreenReader.Core
             if (!IsEntityValid(entityInfo))
                 return false;
 
+            // Check cache first for instant response
+            string cacheKey = GetEntityCacheKey(entityInfo);
+            if (cacheKey != null && pathfindingCache.ContainsKey(cacheKey))
+            {
+                return pathfindingCache[cacheKey];
+            }
+
+            // Not in cache - run pathfinding immediately and cache result
             var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
                 return false;
@@ -640,6 +791,12 @@ namespace FFVI_ScreenReader.Core
                 playerController.mapHandle,
                 playerController.fieldPlayer
             );
+
+            // Cache the result for future checks
+            if (cacheKey != null)
+            {
+                pathfindingCache[cacheKey] = pathInfo.Success;
+            }
 
             return pathInfo.Success;
         }
