@@ -5,6 +5,7 @@ using Il2CppLast.Management;
 using Il2CppLast.UI;
 using MelonLoader;
 using UnityEngine;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -60,17 +61,9 @@ namespace FFVI_ScreenReader.Menus
                     if (current.name.Contains("info_content") || current.name.Contains("status_info"))
                     {
                         // Check if this is equipment slot navigation (has part_text and last_text)
-                        var texts = current.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                        bool hasPartText = false;
-                        bool hasLastText = false;
-                        foreach (var t in texts)
-                        {
-                            if (t != null && t.name != null)
-                            {
-                                if (t.name.Contains("part_text")) hasPartText = true;
-                                if (t.name.Contains("last_text")) hasLastText = true;
-                            }
-                        }
+                        // Use non-allocating existence checks instead of GetComponentsInChildren
+                        bool hasPartText = HasTextWithNameContaining(current, "part_text");
+                        bool hasLastText = HasTextWithNameContaining(current, "last_text");
 
                         if (hasPartText && hasLastText)
                         {
@@ -107,14 +100,12 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                var allTransforms = root.GetComponentsInChildren<Transform>();
-                foreach (var t in allTransforms)
+                // Use non-allocating recursive search
+                var content = FindTransformInChildren(root, "Content");
+                if (content != null && content.parent != null &&
+                    (content.parent.name == "Viewport" || content.parent.parent?.name == "Scroll View"))
                 {
-                    if (t.name == "Content" && t.parent != null &&
-                        (t.parent.name == "Viewport" || t.parent.parent?.name == "Scroll View"))
-                    {
-                        return t;
-                    }
+                    return content;
                 }
             }
             catch (Exception ex)
@@ -175,9 +166,6 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                var allTexts = slotTransform.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                MelonLogger.Msg($"Found {allTexts.Length} text components in character slot");
-
                 // Look for specific text patterns
                 string characterName = null;
                 string jobName = null;
@@ -186,13 +174,16 @@ namespace FFVI_ScreenReader.Menus
                 string maxHP = null;
                 string currentMP = null;
                 string maxMP = null;
+                int textCount = 0;
 
-                foreach (var text in allTexts)
+                // Use non-allocating traversal instead of GetComponentsInChildren
+                ForEachTextInChildren(slotTransform, text =>
                 {
-                    if (text == null || text.text == null) continue;
+                    textCount++;
+                    if (text == null || text.text == null) return;
 
                     string content = text.text.Trim();
-                    if (string.IsNullOrEmpty(content)) continue;
+                    if (string.IsNullOrEmpty(content)) return;
 
                     MelonLogger.Msg($"  Text component '{text.name}': '{content}'");
 
@@ -245,7 +236,9 @@ namespace FFVI_ScreenReader.Menus
                             maxMP = content;
                         }
                     }
-                }
+                });
+
+                MelonLogger.Msg($"Found {textCount} text components in character slot");
 
                 // Build announcement string
                 string announcement = "";

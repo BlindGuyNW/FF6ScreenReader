@@ -7,6 +7,7 @@ using ConfigCommandController_Touch = Il2CppLast.UI.Touch.ConfigCommandControlle
 using ConfigCommandController_KeyInput = Il2CppLast.UI.KeyInput.ConfigCommandController;
 using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
 using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -54,16 +55,13 @@ namespace FFVI_ScreenReader.Menus
                 // Check dropdown
                 if (view.dropDown != null)
                 {
-                    var dropdownTexts = view.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
-                    foreach (var text in dropdownTexts)
+                    var labelText = FindTextInChildren(view.dropDown.transform, "Label");
+                    if (labelText != null && !string.IsNullOrEmpty(labelText.text?.Trim()))
                     {
-                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        var value = labelText.text.Trim();
+                        if (!IsPlaceholderText(value))
                         {
-                            var value = text.text.Trim();
-                            if (!IsPlaceholderText(value))
-                            {
-                                return value;
-                            }
+                            return value;
                         }
                     }
                 }
@@ -292,16 +290,13 @@ namespace FFVI_ScreenReader.Menus
                 // Check if slider type is active
                 if (view.sliderTypeRoot != null && view.sliderTypeRoot.activeInHierarchy)
                 {
-                    var texts = view.sliderTypeRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                    foreach (var text in texts)
+                    var text = FindTextInChildren(view.sliderTypeRoot.transform, "last_text");
+                    if (text != null && !string.IsNullOrEmpty(text.text?.Trim()))
                     {
-                        if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        var value = text.text.Trim();
+                        if (!IsPlaceholderText(value))
                         {
-                            var value = text.text.Trim();
-                            if (!IsPlaceholderText(value))
-                            {
-                                return value;
-                            }
+                            return value;
                         }
                     }
                 }
@@ -309,16 +304,13 @@ namespace FFVI_ScreenReader.Menus
                 // Check if arrow button type is active
                 if (view.arrowButtonTypeRoot != null && view.arrowButtonTypeRoot.activeInHierarchy)
                 {
-                    var texts = view.arrowButtonTypeRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                    foreach (var text in texts)
+                    var text = FindTextInChildren(view.arrowButtonTypeRoot.transform, "last_text");
+                    if (text != null && !string.IsNullOrEmpty(text.text?.Trim()))
                     {
-                        if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        var value = text.text.Trim();
+                        if (!IsPlaceholderText(value))
                         {
-                            var value = text.text.Trim();
-                            if (!IsPlaceholderText(value))
-                            {
-                                return value;
-                            }
+                            return value;
                         }
                     }
                 }
@@ -326,17 +318,13 @@ namespace FFVI_ScreenReader.Menus
                 // Check if button select type is active (used for dropdowns in Touch version)
                 if (view.buttonSelectTypeRoot != null && view.buttonSelectTypeRoot.activeInHierarchy)
                 {
-                    var texts = view.buttonSelectTypeRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                    foreach (var text in texts)
+                    var text = FindTextInChildren(view.buttonSelectTypeRoot.transform, "last_text");
+                    if (text != null && !string.IsNullOrEmpty(text.text?.Trim()))
                     {
-                        // Look for value text (not the label)
-                        if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        var value = text.text.Trim();
+                        if (value != "new text" && value != "Option A")
                         {
-                            var value = text.text.Trim();
-                            if (value != "new text" && value != "Option A")
-                            {
-                                return value;
-                            }
+                            return value;
                         }
                     }
                 }
@@ -382,16 +370,13 @@ namespace FFVI_ScreenReader.Menus
                 // Check dropdown
                 if (view.dropDown != null)
                 {
-                    var dropdownTexts = view.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
-                    foreach (var text in dropdownTexts)
+                    var labelText = FindTextInChildren(view.dropDown.transform, "Label");
+                    if (labelText != null && !string.IsNullOrEmpty(labelText.text?.Trim()))
                     {
-                        if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
+                        var value = labelText.text.Trim();
+                        if (!IsPlaceholderText(value))
                         {
-                            var value = text.text.Trim();
-                            if (!IsPlaceholderText(value))
-                            {
-                                return value;
-                            }
+                            return value;
                         }
                     }
                 }
@@ -443,17 +428,14 @@ namespace FFVI_ScreenReader.Menus
                     // Check dropdown
                     if (configViewKeyInput.dropDown != null)
                     {
-                        var dropdownTexts = configViewKeyInput.dropDown.GetComponentsInChildren<UnityEngine.UI.Text>();
-                        foreach (var text in dropdownTexts)
+                        var labelText = FindTextInChildren(configViewKeyInput.dropDown.transform, "Label");
+                        if (labelText != null && !string.IsNullOrEmpty(labelText.text?.Trim()))
                         {
-                            if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()))
+                            var value = labelText.text.Trim();
+                            if (value != "new text")
                             {
-                                var value = text.text.Trim();
-                                if (value != "new text")
-                                {
-                                    MelonLogger.Msg($"Found KeyInput dropdown value: '{value}'");
-                                    return value;
-                                }
+                                MelonLogger.Msg($"Found KeyInput dropdown value: '{value}'");
+                                return value;
                             }
                         }
                     }
@@ -477,17 +459,14 @@ namespace FFVI_ScreenReader.Menus
             var sliderRoot = rootChild.Find("slider_type_root");
             if (sliderRoot != null && sliderRoot.gameObject.activeInHierarchy)
             {
-                var sliderTexts = sliderRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                foreach (var text in sliderTexts)
+                var text = FindTextInChildren(sliderRoot, "last_text");
+                if (text != null && !string.IsNullOrEmpty(text.text?.Trim()))
                 {
-                    if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                    var value = text.text.Trim();
+                    if (!IsPlaceholderText(value)) // Skip placeholder text
                     {
-                        var value = text.text.Trim();
-                        if (!IsPlaceholderText(value)) // Skip placeholder text
-                        {
-                            MelonLogger.Msg($"Found slider value: '{value}'");
-                            return value;
-                        }
+                        MelonLogger.Msg($"Found slider value: '{value}'");
+                        return value;
                     }
                 }
             }
@@ -496,17 +475,14 @@ namespace FFVI_ScreenReader.Menus
             var arrowRoot = rootChild.Find("arrowbutton_type_root");
             if (arrowRoot != null && arrowRoot.gameObject.activeInHierarchy)
             {
-                var arrowTexts = arrowRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                foreach (var text in arrowTexts)
+                var text = FindTextInChildren(arrowRoot, "last_text");
+                if (text != null && !string.IsNullOrEmpty(text.text?.Trim()))
                 {
-                    if (text.name == "last_text" && !string.IsNullOrEmpty(text.text?.Trim()))
+                    var value = text.text.Trim();
+                    if (!IsPlaceholderText(value)) // Skip placeholder text
                     {
-                        var value = text.text.Trim();
-                        if (!IsPlaceholderText(value)) // Skip placeholder text
-                        {
-                            MelonLogger.Msg($"Found arrow value: '{value}'");
-                            return value;
-                        }
+                        MelonLogger.Msg($"Found arrow value: '{value}'");
+                        return value;
                     }
                 }
             }
@@ -515,17 +491,14 @@ namespace FFVI_ScreenReader.Menus
             var dropdownRoot = rootChild.Find("dropdown_type_root");
             if (dropdownRoot != null && dropdownRoot.gameObject.activeInHierarchy)
             {
-                var dropdownTexts = dropdownRoot.GetComponentsInChildren<UnityEngine.UI.Text>();
-                foreach (var text in dropdownTexts)
+                var text = FindTextInChildren(dropdownRoot, "Label");
+                if (text != null && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
                 {
-                    if (text.name == "Label" && !string.IsNullOrEmpty(text.text?.Trim()) && text.text != "Option A")
+                    var value = text.text.Trim();
+                    if (!IsPlaceholderText(value)) // Skip placeholder text
                     {
-                        var value = text.text.Trim();
-                        if (!IsPlaceholderText(value)) // Skip placeholder text
-                        {
-                            MelonLogger.Msg($"Found dropdown value: '{value}'");
-                            return value;
-                        }
+                        MelonLogger.Msg($"Found dropdown value: '{value}'");
+                        return value;
                     }
                 }
             }
@@ -538,14 +511,12 @@ namespace FFVI_ScreenReader.Menus
         /// </summary>
         private static Transform FindContentList(Transform root)
         {
-            var allTransforms = root.GetComponentsInChildren<Transform>();
-            foreach (var t in allTransforms)
+            // Use non-allocating recursive search
+            var content = FindTransformInChildren(root, "Content");
+            if (content != null && content.parent != null &&
+                (content.parent.name == "Viewport" || content.parent.parent?.name == "Scroll View"))
             {
-                if (t.name == "Content" && t.parent != null &&
-                    (t.parent.name == "Viewport" || t.parent.parent?.name == "Scroll View"))
-                {
-                    return t;
-                }
+                return content;
             }
             return null;
         }

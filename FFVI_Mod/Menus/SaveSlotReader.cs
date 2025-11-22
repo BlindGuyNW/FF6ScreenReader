@@ -4,6 +4,7 @@ using Il2CppLast.Management;
 using Il2CppLast.UI.Touch;
 using MelonLoader;
 using UnityEngine;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -73,14 +74,12 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                var allTransforms = root.GetComponentsInChildren<Transform>();
-                foreach (var t in allTransforms)
+                // Use non-allocating recursive search
+                var content = FindTransformInChildren(root, "Content");
+                if (content != null && content.parent != null &&
+                    (content.parent.name == "Viewport" || content.parent.parent?.name == "Scroll View"))
                 {
-                    if (t.name == "Content" && t.parent != null &&
-                        (t.parent.name == "Viewport" || t.parent.parent?.name == "Scroll View"))
-                    {
-                        return t;
-                    }
+                    return content;
                 }
             }
             catch (Exception ex)
@@ -238,9 +237,6 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                var allTexts = slotTransform.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                MelonLogger.Msg($"Found {allTexts.Length} text components in slot");
-
                 // Look for specific text patterns
                 string location = null;
                 string playTimeHour = null;
@@ -250,13 +246,16 @@ namespace FFVI_ScreenReader.Menus
                 string empty = null;
                 string slotType = null;  // Autosave, Quicksave, File, etc.
                 string slotNumber = null;
+                int textCount = 0;
 
-                foreach (var text in allTexts)
+                // Use non-allocating traversal instead of GetComponentsInChildren
+                ForEachTextInChildren(slotTransform, text =>
                 {
-                    if (text == null || text.text == null) continue;
+                    textCount++;
+                    if (text == null || text.text == null) return;
 
                     string content = text.text.Trim();
-                    if (string.IsNullOrEmpty(content)) continue;
+                    if (string.IsNullOrEmpty(content)) return;
 
                     MelonLogger.Msg($"  Text component '{text.name}': '{content}'");
 
@@ -303,7 +302,9 @@ namespace FFVI_ScreenReader.Menus
                     {
                         empty = content;
                     }
-                }
+                });
+
+                MelonLogger.Msg($"Found {textCount} text components in slot");
 
                 // IMPORTANT: Only treat as empty if we have NO character data
                 // The "empty" text component exists on all slots, it's just hidden on occupied ones

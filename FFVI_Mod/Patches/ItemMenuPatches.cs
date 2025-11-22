@@ -5,6 +5,7 @@ using Il2CppLast.UI.KeyInput;
 using Il2CppLast.UI;
 using Il2CppLast.Defaine;
 using FFVI_ScreenReader.Core;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -64,8 +65,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
-                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
-                itemName = itemName.Trim();
+                itemName = StripIconMarkup(itemName);
 
                 if (string.IsNullOrEmpty(itemName))
                 {
@@ -86,9 +86,8 @@ namespace FFVI_ScreenReader.Patches
                 string description = itemData.Description;
                 if (!string.IsNullOrEmpty(description))
                 {
-                    // Remove icon markup like <ic_Drag>, <IC_DRAG>, etc.
-                    description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                    description = description.Trim();
+                    // Remove icon markup
+                    description = StripIconMarkup(description);
 
                     if (!string.IsNullOrEmpty(description))
                     {
@@ -161,8 +160,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
-                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
-                itemName = itemName.Trim();
+                itemName = StripIconMarkup(itemName);
 
                 if (string.IsNullOrEmpty(itemName))
                 {
@@ -177,8 +175,7 @@ namespace FFVI_ScreenReader.Patches
                 if (!string.IsNullOrEmpty(paramMessage))
                 {
                     // Remove icon markup
-                    paramMessage = System.Text.RegularExpressions.Regex.Replace(paramMessage, @"<[iI][cC]_[^>]+>", "");
-                    paramMessage = paramMessage.Trim();
+                    paramMessage = StripIconMarkup(paramMessage);
 
                     if (!string.IsNullOrEmpty(paramMessage))
                     {
@@ -191,8 +188,7 @@ namespace FFVI_ScreenReader.Patches
                 if (!string.IsNullOrEmpty(description))
                 {
                     // Remove icon markup
-                    description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                    description = description.Trim();
+                    description = StripIconMarkup(description);
 
                     if (!string.IsNullOrEmpty(description))
                     {
@@ -333,8 +329,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Filter icon markup
-                announcement = System.Text.RegularExpressions.Regex.Replace(announcement, @"<[iI][cC]_[^>]+>", "");
-                announcement = announcement.Trim();
+                announcement = StripIconMarkup(announcement);
 
                 // Skip duplicates
                 if (announcement == lastAnnouncement)

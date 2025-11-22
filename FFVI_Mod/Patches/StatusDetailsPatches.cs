@@ -113,6 +113,10 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Register the controller in GameObjectCache
+                Utils.GameObjectCache.Register(__instance);
+                MelonLogger.Msg($"[StatusDetailsController] Registered StatusDetailsController in GameObjectCache");
+
                 // Use coroutine for one-frame delay to ensure UI has updated
                 CoroutineManager.StartManaged(DelayedStatusAnnouncement(__instance));
             }

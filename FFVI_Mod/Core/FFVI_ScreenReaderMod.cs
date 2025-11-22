@@ -30,13 +30,12 @@ namespace FFVI_ScreenReader.Core
     public class FFVI_ScreenReaderMod : MelonMod
     {
         private static TolkWrapper tolk;
+        private InputManager inputManager;
+        private EntityCache entityCache;
+        private EntityNavigator entityNavigator;
 
-        // Entity cycling
+        // Entity scanning
         private const float ENTITY_SCAN_INTERVAL = 5f;
-        private float lastEntityScanTime = 0f;
-        private System.Collections.Generic.List<EntityInfo> cachedEntities = new System.Collections.Generic.List<EntityInfo>();
-        private int currentEntityIndex = 0;
-        private EntityCategory currentCategory = EntityCategory.All;
 
         // Pathfinding filter toggle
         private bool filterByPathfinding = false;
@@ -56,6 +55,9 @@ namespace FFVI_ScreenReader.Core
         {
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
 
+            // Subscribe to scene load events for automatic component caching
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
+
             // Initialize preferences
             prefsCategory = MelonPreferences.CreateCategory("FFVI_ScreenReader");
             prefPathfindingFilter = prefsCategory.CreateEntry<bool>("PathfindingFilter", false, "Pathfinding Filter", "Only show entities with valid paths when cycling");
@@ -68,40 +70,117 @@ namespace FFVI_ScreenReader.Core
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
             tolk.Load();
+
+            // Initialize entity cache and navigator
+            entityCache = new EntityCache(ENTITY_SCAN_INTERVAL);
+
+            entityNavigator = new EntityNavigator(entityCache);
+            entityNavigator.FilterByPathfinding = filterByPathfinding;
+            entityNavigator.FilterMapExits = filterMapExits;
+
+            // Initialize input manager
+            inputManager = new InputManager(this);
         }
 
         public override void OnDeinitializeMelon()
         {
+            // Unsubscribe from scene load events
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
+
             CoroutineManager.CleanupAll();
             tolk?.Unload();
         }
 
-        public override void OnUpdate()
+        /// <summary>
+        /// Called when a new scene is loaded.
+        /// Automatically caches commonly-used Unity components to avoid expensive FindObjectOfType calls.
+        /// </summary>
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
         {
-            // Check if ANY Unity InputField is focused - if so, let all keys pass through
             try
             {
-                var inputField = UnityEngine.Object.FindObjectOfType<UnityEngine.UI.InputField>();
-                if (inputField != null && inputField.isFocused)
+                LoggerInstance.Msg($"[ComponentCache] Scene loaded: {scene.name}");
+
+                // Try to find and cache FieldPlayerController
+                var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
+                if (playerController != null)
                 {
-                    // Player is typing text - skip all hotkey processing
-                    return;
+                    Utils.GameObjectCache.Register(playerController);
+                    LoggerInstance.Msg($"[ComponentCache] Cached FieldPlayerController: {playerController.gameObject?.name}");
+                }
+                else
+                {
+                    LoggerInstance.Msg("[ComponentCache] No FieldPlayerController found in scene");
+                }
+
+                // Try to find and cache FieldMap
+                var fieldMap = UnityEngine.Object.FindObjectOfType<Il2Cpp.FieldMap>();
+                if (fieldMap != null)
+                {
+                    Utils.GameObjectCache.Register(fieldMap);
+                    LoggerInstance.Msg($"[ComponentCache] Cached FieldMap: {fieldMap.gameObject?.name}");
+
+                    // Delay entity scan to allow scene to fully initialize
+                    CoroutineManager.StartManaged(DelayedInitialScan());
+                }
+                else
+                {
+                    LoggerInstance.Msg("[ComponentCache] No FieldMap found in scene");
                 }
             }
             catch (System.Exception ex)
             {
-                // If we can't check input field state, continue with normal hotkey processing
-                LoggerInstance.Warning($"Error checking input field state: {ex.Message}");
+                LoggerInstance.Error($"[ComponentCache] Error in OnSceneLoaded: {ex.Message}");
             }
+        }
 
-            // Periodically rescan entities
-            if (Time.time - lastEntityScanTime >= ENTITY_SCAN_INTERVAL)
-            {
-                lastEntityScanTime = Time.time;
-                RescanEntities();
-            }
+        /// <summary>
+        /// Coroutine that delays entity scanning to allow scene to fully initialize.
+        /// </summary>
+        private System.Collections.IEnumerator DelayedInitialScan()
+        {
+            // Wait 0.5 seconds for scene to fully initialize and entities to spawn
+            yield return new UnityEngine.WaitForSeconds(0.5f);
+
+            // Scan for entities - EntityNavigator will be updated via OnEntityAdded events
+            // No need to call RebuildNavigationList() as the event handlers already filter and add entities
+            entityCache.ForceScan();
+
+            LoggerInstance.Msg("[ComponentCache] Delayed initial entity scan completed");
+        }
+
+        /// <summary>
+        /// Coroutine that delays entity scanning after map transition to allow entities to spawn.
+        /// </summary>
+        private System.Collections.IEnumerator DelayedMapTransitionScan()
+        {
+            // Wait 0.5 seconds for new map entities to spawn
+            yield return new UnityEngine.WaitForSeconds(0.5f);
+
+            // Scan for entities - EntityNavigator will be updated via OnEntityAdded/OnEntityRemoved events
+            // No need to call RebuildNavigationList() as the event handlers already filter and add entities
+            entityCache.ForceScan();
+
+            LoggerInstance.Msg("[ComponentCache] Delayed map transition entity scan completed");
+        }
+
+        public override void OnUpdate()
+        {
+            // Update entity cache (handles periodic rescanning)
+            entityCache.Update();
 
             // Check for map transitions
+            CheckMapTransition();
+
+            // Handle all input
+            inputManager.Update();
+        }
+
+        /// <summary>
+        /// Checks for map transitions and announces the new map name.
+        /// </summary>
+        private void CheckMapTransition()
+        {
             try
             {
                 var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
@@ -114,6 +193,9 @@ namespace FFVI_ScreenReader.Core
                         string mapName = Field.MapNameResolver.GetCurrentMapName();
                         SpeakText($"Entering {mapName}", interrupt: false);
                         lastAnnouncedMapId = currentMapId;
+
+                        // Delay entity scan to allow new map to fully initialize
+                        CoroutineManager.StartManaged(DelayedMapTransitionScan());
                     }
                     else if (lastAnnouncedMapId == -1)
                     {
@@ -126,278 +208,33 @@ namespace FFVI_ScreenReader.Core
             {
                 LoggerInstance.Warning($"Error detecting map transition: {ex.Message}");
             }
-
-            // Check if status details screen is active to route J/L keys appropriately
-            var statusController = UnityEngine.Object.FindObjectOfType<Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController>();
-            bool statusScreenActive = statusController != null &&
-                                     statusController.gameObject != null &&
-                                     statusController.gameObject.activeInHierarchy;
-
-            if (statusScreenActive)
-            {
-                // On status screen: J/[ announces physical stats, L/] announces magical stats
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
-                {
-                    string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
-                    SpeakText(physicalStats);
-                }
-
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
-                {
-                    string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
-                    SpeakText(magicalStats);
-                }
-            }
-            else
-            {
-                // On field: J/L/K/P (and legacy [/]/\) handle entity navigation
-
-                // Hotkey: J or [ to cycle backwards
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.J) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftBracket))
-                {
-                    // Check for Shift+J/[ (cycle categories backward)
-                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
-                    {
-                        CyclePreviousCategory();
-                    }
-                    else
-                    {
-                        // Just J/[ (cycle entities backward)
-                        CyclePrevious();
-                    }
-                }
-
-                // Hotkey: K to repeat current entity
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.K))
-                {
-                    AnnounceEntityOnly();
-                }
-
-                // Hotkey: L or ] to cycle forwards
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.L) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightBracket))
-                {
-                    // Check for Shift+L/] (cycle categories forward)
-                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
-                    {
-                        CycleNextCategory();
-                    }
-                    else
-                    {
-                        // Just L/] (cycle entities forward)
-                        CycleNext();
-                    }
-                }
-
-                // Hotkey: P or \ to pathfind to current entity
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.P) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Backslash))
-                {
-                    // Check for Shift+P/\ (toggle pathfinding filter)
-                    if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
-                    {
-                        TogglePathfindingFilter();
-                    }
-                    else
-                    {
-                        // Just P/\ (pathfind to current entity)
-                        AnnounceCurrentEntity();
-                    }
-                }
-            }
-
-            // Hotkey: Ctrl+Arrow to teleport in the direction of the arrow
-            bool ctrlHeld = UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftControl) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightControl);
-            if (ctrlHeld)
-            {
-                if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.UpArrow))
-                {
-                    TeleportInDirection(new Vector2(0, 16)); // North
-                }
-                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.DownArrow))
-                {
-                    TeleportInDirection(new Vector2(0, -16)); // South
-                }
-                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.LeftArrow))
-                {
-                    TeleportInDirection(new Vector2(-16, 0)); // West
-                }
-                else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.RightArrow))
-                {
-                    TeleportInDirection(new Vector2(16, 0)); // East
-                }
-            }
-
-            // Hotkey: H to announce airship heading (if on airship) or character health (if in battle)
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.H))
-            {
-                // Check if we're on the airship by finding an active airship controller with input enabled
-                var allControllers = UnityEngine.Object.FindObjectsOfType<FieldPlayerController>();
-                Il2CppLast.Map.FieldPlayerKeyAirshipController activeAirshipController = null;
-
-                foreach (var controller in allControllers)
-                {
-                    if (controller != null && controller.gameObject != null && controller.gameObject.activeInHierarchy)
-                    {
-                        var airshipController = controller.TryCast<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
-                        if (airshipController != null && airshipController.InputEnable)
-                        {
-                            activeAirshipController = airshipController;
-                            break;
-                        }
-                    }
-                }
-
-                if (activeAirshipController != null)
-                {
-                    AnnounceAirshipStatus();
-                }
-                else
-                {
-                    // Fall back to battle character status
-                    AnnounceCurrentCharacterStatus();
-                }
-            }
-
-            // Hotkey: G to announce current gil amount
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.G))
-            {
-                AnnounceGilAmount();
-            }
-
-            // Hotkey: M to announce current map name
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.M))
-            {
-                // Check for Shift+M (toggle map exit filter)
-                if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
-                {
-                    ToggleMapExitFilter();
-                }
-                else
-                {
-                    // Just M (announce current map)
-                    AnnounceCurrentMap();
-                }
-            }
-
-            // Hotkey: 0 (Alpha0) or Shift+K to reset to All category
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha0))
-            {
-                ResetToAllCategory();
-            }
-
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.K) &&
-                (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift)))
-            {
-                ResetToAllCategory();
-            }
-
-            // Hotkey: = (Equals) or Shift+L/] to cycle to next category
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Equals))
-            {
-                CycleNextCategory();
-            }
-
-            // Hotkey: - (Minus) or Shift+J/[ to cycle to previous category
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Minus))
-            {
-                CyclePreviousCategory();
-            }
-
-            // Hotkey: T to announce active timers
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.T))
-            {
-                // Check for Shift+T (freeze/resume timers)
-                if (UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift))
-                {
-                    Patches.TimerHelper.ToggleTimerFreeze();
-                }
-                else
-                {
-                    // Just T (announce timers)
-                    Patches.TimerHelper.AnnounceActiveTimers();
-                }
-            }
         }
 
-        private void RescanEntities()
+        internal void AnnounceCurrentEntity()
         {
-            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
-
-            if (playerController?.fieldPlayer == null)
-            {
-                cachedEntities.Clear();
-                currentEntityIndex = 0;
-                return;
-            }
-
-            // Remember the currently selected entity by its position
-            EntityInfo previousEntity = null;
-            if (currentEntityIndex >= 0 && currentEntityIndex < cachedEntities.Count)
-            {
-                previousEntity = cachedEntities[currentEntityIndex];
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.position;
-            cachedEntities = Field.FieldNavigationHelper.GetNearbyEntities(playerPos, currentCategory, filterMapExits);
-
-            // Try to find the same entity in the new list (by position)
-            if (previousEntity != null)
-            {
-                for (int i = 0; i < cachedEntities.Count; i++)
-                {
-                    // Match by position (within small tolerance)
-                    if (Vector3.Distance(cachedEntities[i].Position, previousEntity.Position) < 1f)
-                    {
-                        currentEntityIndex = i;
-                        return;
-                    }
-                }
-            }
-
-            // If not found or no previous entity, reset to 0
-            if (currentEntityIndex >= cachedEntities.Count)
-                currentEntityIndex = 0;
-        }
-
-        private void AnnounceCurrentEntity()
-        {
-            if (cachedEntities.Count == 0)
+            var entity = entityNavigator.CurrentEntity;
+            if (entity == null)
             {
                 SpeakText("No entities nearby");
                 return;
             }
 
-            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
+            var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
                 SpeakText("Not in field");
                 return;
             }
 
-            var entityInfo = cachedEntities[currentEntityIndex];
-
-            // Validate entity is still active before using it
-            if (!IsEntityValid(entityInfo))
-            {
-                // Entity has become invalid, rescan and try again
-                RescanEntities();
-                if (cachedEntities.Count == 0)
-                {
-                    SpeakText("No entities nearby");
-                    return;
-                }
-                entityInfo = cachedEntities[currentEntityIndex];
-            }
             // CRITICAL: Touch controller uses localPosition, NOT position!
             Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
+            Vector3 targetPos = entity.GameEntity.transform.localPosition;
 
-            // Pass current player position to get fresh direction/distance (use world position for display)
-            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerController.fieldPlayer.transform.position);
             var pathInfo = Field.FieldNavigationHelper.FindPathTo(
                 playerPos,
                 targetPos,
                 playerController.mapHandle,
-                playerController.fieldPlayer  // Pass the player entity!
+                playerController.fieldPlayer
             );
 
             string announcement;
@@ -414,116 +251,67 @@ namespace FFVI_ScreenReader.Core
             SpeakText(announcement);
         }
 
-        private void CycleNext()
+        internal void CycleNext()
         {
-            if (cachedEntities.Count == 0)
+            if (entityNavigator.CycleNext())
             {
-                SpeakText("No entities nearby");
-                return;
+                AnnounceEntityOnly();
             }
-
-            int startIndex = currentEntityIndex;
-            int attempts = 0;
-            int maxAttempts = cachedEntities.Count;
-
-            do
+            else
             {
-                currentEntityIndex = (currentEntityIndex + 1) % cachedEntities.Count;
-                attempts++;
-
-                // If pathfinding filter is OFF, or if we found a pathable entity, stop
-                if (!filterByPathfinding || HasValidPath(currentEntityIndex))
+                // Either no entities or no pathable entities found
+                if (entityNavigator.EntityCount == 0)
                 {
-                    AnnounceEntityOnly();
-                    return;
+                    SpeakText("No entities nearby");
                 }
-
-                // Prevent infinite loop - if we've checked all entities
-                if (attempts >= maxAttempts)
+                else
                 {
-                    // Restore original index and announce no pathable entities
-                    currentEntityIndex = startIndex;
                     SpeakText("No pathable entities found");
-                    return;
                 }
             }
-            while (true);
         }
 
-        private void CyclePrevious()
+        internal void CyclePrevious()
         {
-            if (cachedEntities.Count == 0)
+            if (entityNavigator.CyclePrevious())
             {
-                SpeakText("No entities nearby");
-                return;
+                AnnounceEntityOnly();
             }
-
-            int startIndex = currentEntityIndex;
-            int attempts = 0;
-            int maxAttempts = cachedEntities.Count;
-
-            do
+            else
             {
-                currentEntityIndex--;
-                if (currentEntityIndex < 0)
-                    currentEntityIndex = cachedEntities.Count - 1;
-
-                attempts++;
-
-                // If pathfinding filter is OFF, or if we found a pathable entity, stop
-                if (!filterByPathfinding || HasValidPath(currentEntityIndex))
+                // Either no entities or no pathable entities found
+                if (entityNavigator.EntityCount == 0)
                 {
-                    AnnounceEntityOnly();
-                    return;
+                    SpeakText("No entities nearby");
                 }
-
-                // Prevent infinite loop - if we've checked all entities
-                if (attempts >= maxAttempts)
+                else
                 {
-                    // Restore original index and announce no pathable entities
-                    currentEntityIndex = startIndex;
                     SpeakText("No pathable entities found");
-                    return;
                 }
             }
-            while (true);
         }
 
-        private void AnnounceEntityOnly()
+        internal void AnnounceEntityOnly()
         {
-            if (cachedEntities.Count == 0)
+            var entity = entityNavigator.CurrentEntity;
+            if (entity == null)
             {
                 SpeakText("No entities nearby");
                 return;
             }
 
-            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
+            var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
                 SpeakText("Not in field");
                 return;
             }
 
-            var entityInfo = cachedEntities[currentEntityIndex];
-
-            // Validate entity is still active before using it
-            if (!IsEntityValid(entityInfo))
-            {
-                // Entity has become invalid, rescan and try again
-                RescanEntities();
-                if (cachedEntities.Count == 0)
-                {
-                    SpeakText("No entities nearby");
-                    return;
-                }
-                entityInfo = cachedEntities[currentEntityIndex];
-            }
             // CRITICAL: Touch controller uses localPosition, NOT position!
             Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
+            Vector3 targetPos = entity.GameEntity.transform.localPosition;
 
-            // Pass current player position to get fresh direction/distance (use world position for display)
-            string formatted = Field.FieldNavigationHelper.FormatEntityInfo(entityInfo, playerController.fieldPlayer.transform.position);
+            string formatted = entity.FormatDescription(playerController.fieldPlayer.transform.position);
 
             // Check if path exists
             var pathInfo = Field.FieldNavigationHelper.FindPathTo(
@@ -534,60 +322,61 @@ namespace FFVI_ScreenReader.Core
             );
 
             // Announce entity info + path status + count at the end
-            string countSuffix = $", {currentEntityIndex + 1} of {cachedEntities.Count}";
+            string countSuffix = $", {entityNavigator.CurrentIndex + 1} of {entityNavigator.EntityCount}";
             string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}, no path{countSuffix}";
             SpeakText(announcement);
         }
 
-        private void CycleNextCategory()
+        internal void CycleNextCategory()
         {
             // Cycle to next category
-            int nextCategory = ((int)currentCategory + 1) % 6;  // 6 categories total
-            currentCategory = (EntityCategory)nextCategory;
+            int nextCategory = ((int)entityNavigator.CurrentCategory + 1) % 6;  // 6 categories total
+            EntityCategory newCategory = (EntityCategory)nextCategory;
 
-            // Rescan with new category
-            RescanEntities();
+            // Update navigator category (automatically rebuilds list)
+            entityNavigator.SetCategory(newCategory);
 
             // Announce new category and count
             AnnounceCategoryChange();
         }
 
-        private void CyclePreviousCategory()
+        internal void CyclePreviousCategory()
         {
             // Cycle to previous category
-            int prevCategory = (int)currentCategory - 1;
+            int prevCategory = (int)entityNavigator.CurrentCategory - 1;
             if (prevCategory < 0)
                 prevCategory = 5;  // Wrap to last category (Vehicles)
 
-            currentCategory = (EntityCategory)prevCategory;
+            EntityCategory newCategory = (EntityCategory)prevCategory;
 
-            // Rescan with new category
-            RescanEntities();
+            // Update navigator category (automatically rebuilds list)
+            entityNavigator.SetCategory(newCategory);
 
             // Announce new category and count
             AnnounceCategoryChange();
         }
 
-        private void ResetToAllCategory()
+        internal void ResetToAllCategory()
         {
-            if (currentCategory == EntityCategory.All)
+            if (entityNavigator.CurrentCategory == EntityCategory.All)
             {
                 SpeakText("Already in All category");
                 return;
             }
 
-            currentCategory = EntityCategory.All;
-
-            // Rescan with All category
-            RescanEntities();
+            // Update navigator category (automatically rebuilds list)
+            entityNavigator.SetCategory(EntityCategory.All);
 
             // Announce category change
             AnnounceCategoryChange();
         }
 
-        private void TogglePathfindingFilter()
+        internal void TogglePathfindingFilter()
         {
             filterByPathfinding = !filterByPathfinding;
+
+            // Update navigator
+            entityNavigator.FilterByPathfinding = filterByPathfinding;
 
             // Save to preferences
             prefPathfindingFilter.Value = filterByPathfinding;
@@ -595,14 +384,15 @@ namespace FFVI_ScreenReader.Core
 
             string status = filterByPathfinding ? "on" : "off";
             SpeakText($"Pathfinding filter {status}");
-
-            // Reset to first entity when toggling
-            currentEntityIndex = 0;
         }
 
-        private void ToggleMapExitFilter()
+        internal void ToggleMapExitFilter()
         {
             filterMapExits = !filterMapExits;
+
+            // Update navigator and rebuild list
+            entityNavigator.FilterMapExits = filterMapExits;
+            entityNavigator.RebuildNavigationList();
 
             // Save to preferences
             prefMapExitFilter.Value = filterMapExits;
@@ -610,89 +400,27 @@ namespace FFVI_ScreenReader.Core
 
             string status = filterMapExits ? "on" : "off";
             SpeakText($"Map exit filter {status}");
-
-            // Rescan entities to apply the new filter
-            RescanEntities();
-        }
-
-        private bool HasValidPath(int entityIndex)
-        {
-            if (entityIndex < 0 || entityIndex >= cachedEntities.Count)
-                return false;
-
-            var entityInfo = cachedEntities[entityIndex];
-
-            // Validate entity is still active
-            if (!IsEntityValid(entityInfo))
-                return false;
-
-            var playerController = UnityEngine.Object.FindObjectOfType<FieldPlayerController>();
-            if (playerController?.fieldPlayer == null)
-                return false;
-
-            // Use localPosition for pathfinding (see CLAUDE.md)
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            Vector3 targetPos = entityInfo.Entity.transform.localPosition;
-
-            var pathInfo = Field.FieldNavigationHelper.FindPathTo(
-                playerPos,
-                targetPos,
-                playerController.mapHandle,
-                playerController.fieldPlayer
-            );
-
-            return pathInfo.Success;
         }
 
         private void AnnounceCategoryChange()
         {
-            string categoryName = GetCategoryName(currentCategory);
-            int entityCount = cachedEntities.Count;
+            string categoryName = EntityNavigator.GetCategoryName(entityNavigator.CurrentCategory);
+            int entityCount = entityNavigator.EntityCount;
 
             string announcement = $"Category: {categoryName}, {entityCount} {(entityCount == 1 ? "entity" : "entities")}";
             SpeakText(announcement);
         }
 
-        private string GetCategoryName(EntityCategory category)
+        internal void TeleportInDirection(Vector2 offset)
         {
-            switch (category)
-            {
-                case EntityCategory.All:
-                    return "All";
-                case EntityCategory.Chests:
-                    return "Chests";
-                case EntityCategory.NPCs:
-                    return "NPCs";
-                case EntityCategory.MapExits:
-                    return "Map Exits";
-                case EntityCategory.Events:
-                    return "Events";
-                case EntityCategory.Vehicles:
-                    return "Vehicles";
-                default:
-                    return "Unknown";
-            }
-        }
-
-        private void TeleportInDirection(Vector2 offset)
-        {
-            if (cachedEntities.Count == 0 || currentEntityIndex < 0 || currentEntityIndex >= cachedEntities.Count)
+            var entity = entityNavigator.CurrentEntity;
+            if (entity == null)
             {
                 SpeakText("No entity selected");
                 return;
             }
 
-            var entityInfo = cachedEntities[currentEntityIndex];
-
-            // Validate entity is still active before teleporting
-            if (!IsEntityValid(entityInfo))
-            {
-                SpeakText("Entity no longer available");
-                RescanEntities();
-                return;
-            }
-
-            var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
+            var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
                 SpeakText("Player not available");
@@ -703,7 +431,7 @@ namespace FFVI_ScreenReader.Core
 
             // Calculate offset position relative to the target entity
             // One cell = 16 units
-            Vector3 targetPos = entityInfo.Position;
+            Vector3 targetPos = entity.Position;
             Vector3 newPos = new Vector3(targetPos.x + offset.x, targetPos.y + offset.y, targetPos.z);
 
             // Instantly teleport by setting localPosition directly
@@ -711,8 +439,8 @@ namespace FFVI_ScreenReader.Core
 
             // Announce direction
             string direction = GetDirectionName(offset);
-            SpeakText($"Teleported {direction} of {entityInfo.Name}");
-            LoggerInstance.Msg($"Teleported {direction} of {entityInfo.Name} to position {newPos}");
+            SpeakText($"Teleported {direction} of {entity.Name}");
+            LoggerInstance.Msg($"Teleported {direction} of {entity.Name} to position {newPos}");
         }
 
         private string GetDirectionName(Vector2 offset)
@@ -808,7 +536,7 @@ namespace FFVI_ScreenReader.Core
             }
         }
 
-        private void AnnounceGilAmount()
+        internal void AnnounceGilAmount()
         {
             try
             {
@@ -832,7 +560,7 @@ namespace FFVI_ScreenReader.Core
             }
         }
 
-        private void AnnounceCurrentMap()
+        internal void AnnounceCurrentMap()
         {
             try
             {
@@ -846,11 +574,44 @@ namespace FFVI_ScreenReader.Core
             }
         }
 
+        /// <summary>
+        /// Announces airship status if on airship, otherwise announces character status in battle.
+        /// </summary>
+        internal void AnnounceAirshipOrCharacterStatus()
+        {
+            // Check if we're on the airship by finding an active airship controller with input enabled
+            var allControllers = UnityEngine.Object.FindObjectsOfType<FieldPlayerController>();
+            Il2CppLast.Map.FieldPlayerKeyAirshipController activeAirshipController = null;
+
+            foreach (var controller in allControllers)
+            {
+                if (controller != null && controller.gameObject != null && controller.gameObject.activeInHierarchy)
+                {
+                    var airshipController = controller.TryCast<Il2CppLast.Map.FieldPlayerKeyAirshipController>();
+                    if (airshipController != null && airshipController.InputEnable)
+                    {
+                        activeAirshipController = airshipController;
+                        break;
+                    }
+                }
+            }
+
+            if (activeAirshipController != null)
+            {
+                AnnounceAirshipStatus();
+            }
+            else
+            {
+                // Fall back to battle character status
+                AnnounceCurrentCharacterStatus();
+            }
+        }
+
         private void AnnounceAirshipStatus()
         {
             try
             {
-                var fieldMap = UnityEngine.Object.FindObjectOfType<FieldMap>();
+                var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                 if (fieldMap == null || fieldMap.fieldController == null)
                 {
                     SpeakText("Airship status not available");
@@ -923,30 +684,190 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
-        /// Validates that an entity is still active and accessible in the game world.
+        /// Debug method for testing and diagnostic information.
+        /// Called by Ctrl+I hotkey.
+        /// Shows the currently selected UI element from EventSystem.
         /// </summary>
-        private bool IsEntityValid(EntityInfo entityInfo)
+        internal void DebugInfo()
         {
-            if (entityInfo?.Entity == null)
-                return false;
-
             try
             {
-                // Check if the GameObject is still active in the hierarchy
-                if (entityInfo.Entity.gameObject == null || !entityInfo.Entity.gameObject.activeInHierarchy)
-                    return false;
+                var debugOutput = new System.Text.StringBuilder();
 
-                // Check if the transform is still valid
-                if (entityInfo.Entity.transform == null)
-                    return false;
+                // Check if EventSystem exists
+                if (UnityEngine.EventSystems.EventSystem.current == null)
+                {
+                    debugOutput.AppendLine("No EventSystem found");
+                    LoggerInstance.Msg("[Debug] No EventSystem found");
+                }
+                else
+                {
+                    var currentObj = UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject;
 
-                return true;
+                    if (currentObj == null)
+                    {
+                        debugOutput.AppendLine("No UI element selected");
+                        LoggerInstance.Msg("[Debug] No UI element selected (currentSelectedGameObject is null)");
+                    }
+                    else
+                    {
+                        string objName = currentObj.name;
+                        debugOutput.AppendLine($"Selected UI element: {objName}");
+                        LoggerInstance.Msg($"[Debug] Selected UI element: {objName}");
+                        LoggerInstance.Msg($"[Debug]   Full path: {GetGameObjectPath(currentObj)}");
+                    }
+                }
+
+                // Check for cached FieldMap
+                var cachedFieldMap = Utils.GameObjectCache.Get<Il2Cpp.FieldMap>();
+                if (cachedFieldMap != null)
+                {
+                    string fieldMapName = cachedFieldMap.gameObject?.name ?? "Unknown";
+                    int instanceId = cachedFieldMap.GetInstanceID();
+                    debugOutput.AppendLine($"FieldMap found in cache: {fieldMapName}, Instance ID: {instanceId}");
+                    LoggerInstance.Msg($"[Debug] FieldMap found in cache, Name: {fieldMapName}, Instance ID: {instanceId}");
+                }
+                else
+                {
+                    debugOutput.AppendLine("FieldMap not found in cache");
+                    LoggerInstance.Msg("[Debug] FieldMap not found in cache");
+                }
+
+                // Find first event entity and print its reflection info
+                LoggerInstance.Msg("[Debug] === Looking for first Event Entity ===");
+                Il2CppLast.Entity.Field.FieldEntity firstEventEntity = null;
+                Field.NavigableEntity firstNavEntity = null;
+
+                foreach (var kvp in entityCache.Entities)
+                {
+                    var fieldEntity = kvp.Key;
+                    if (fieldEntity?.Property != null)
+                    {
+                        Il2Cpp.MapConstants.ObjectType objectType = (Il2Cpp.MapConstants.ObjectType)fieldEntity.Property.ObjectType;
+                        if (objectType == Il2Cpp.MapConstants.ObjectType.TelepoPoint ||
+                            objectType == Il2Cpp.MapConstants.ObjectType.Event ||
+                            objectType == Il2Cpp.MapConstants.ObjectType.SwitchEvent ||
+                            objectType == Il2Cpp.MapConstants.ObjectType.RandomEvent ||
+                            objectType == Il2Cpp.MapConstants.ObjectType.TransportationEventAction)
+                        {
+                            firstEventEntity = fieldEntity;
+                            firstNavEntity = kvp.Value;
+                            break;
+                        }
+                    }
+                }
+
+                if (firstEventEntity == null)
+                {
+                    debugOutput.AppendLine("No event entities found");
+                    LoggerInstance.Msg("[Debug] No event entities found");
+                }
+                else
+                {
+                    Il2Cpp.MapConstants.ObjectType objectType = (Il2Cpp.MapConstants.ObjectType)firstEventEntity.Property.ObjectType;
+                    string enumName = objectType.ToString();
+                    string entityName = firstNavEntity?.Name ?? "Unknown";
+                    debugOutput.AppendLine($"First Event: {entityName}, Type: {enumName}");
+                    LoggerInstance.Msg($"[Debug] First Event: {entityName}, Type: {enumName}");
+
+                    // Reflect on FieldEntity
+                    var fieldEntityType = firstEventEntity.GetType();
+                    debugOutput.AppendLine($"FieldEntity Type: {fieldEntityType.Name}");
+                    LoggerInstance.Msg($"[Debug] === FieldEntity ({fieldEntityType.Name}) ===");
+
+                    var fieldEntityMethods = fieldEntityType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"FieldEntity Methods ({fieldEntityMethods.Length}):");
+                    LoggerInstance.Msg($"[Debug] FieldEntity Methods ({fieldEntityMethods.Length}):");
+                    foreach (var method in fieldEntityMethods)
+                    {
+                        var parameters = method.GetParameters();
+                        string paramStr = string.Join(", ", System.Linq.Enumerable.Select(parameters, p => $"{p.ParameterType.Name} {p.Name}"));
+                        string methodSig = $"{method.ReturnType.Name} {method.Name}({paramStr})";
+                        debugOutput.AppendLine($"  {methodSig}");
+                        LoggerInstance.Msg($"[Debug]   {methodSig}");
+                    }
+
+                    var fieldEntityProperties = fieldEntityType.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"FieldEntity Properties ({fieldEntityProperties.Length}):");
+                    LoggerInstance.Msg($"[Debug] FieldEntity Properties ({fieldEntityProperties.Length}):");
+                    foreach (var prop in fieldEntityProperties)
+                    {
+                        string propSig = $"{prop.PropertyType.Name} {prop.Name}";
+                        debugOutput.AppendLine($"  {propSig}");
+                        LoggerInstance.Msg($"[Debug]   {propSig}");
+                    }
+
+                    var fieldEntityFields = fieldEntityType.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"FieldEntity Fields ({fieldEntityFields.Length}):");
+                    LoggerInstance.Msg($"[Debug] FieldEntity Fields ({fieldEntityFields.Length}):");
+                    foreach (var field in fieldEntityFields)
+                    {
+                        string fieldSig = $"{field.FieldType.Name} {field.Name}";
+                        debugOutput.AppendLine($"  {fieldSig}");
+                        LoggerInstance.Msg($"[Debug]   {fieldSig}");
+                    }
+
+                    // Reflect on Property
+                    var propertyType = firstEventEntity.Property.GetType();
+                    debugOutput.AppendLine($"Property Type: {propertyType.Name}");
+                    LoggerInstance.Msg($"[Debug] === Property ({propertyType.Name}) ===");
+
+                    var propertyMethods = propertyType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"Property Methods ({propertyMethods.Length}):");
+                    LoggerInstance.Msg($"[Debug] Property Methods ({propertyMethods.Length}):");
+                    foreach (var method in propertyMethods)
+                    {
+                        var parameters = method.GetParameters();
+                        string paramStr = string.Join(", ", System.Linq.Enumerable.Select(parameters, p => $"{p.ParameterType.Name} {p.Name}"));
+                        string methodSig = $"{method.ReturnType.Name} {method.Name}({paramStr})";
+                        debugOutput.AppendLine($"  {methodSig}");
+                        LoggerInstance.Msg($"[Debug]   {methodSig}");
+                    }
+
+                    var propertyProperties = propertyType.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"Property Properties ({propertyProperties.Length}):");
+                    LoggerInstance.Msg($"[Debug] Property Properties ({propertyProperties.Length}):");
+                    foreach (var prop in propertyProperties)
+                    {
+                        string propSig = $"{prop.PropertyType.Name} {prop.Name}";
+                        debugOutput.AppendLine($"  {propSig}");
+                        LoggerInstance.Msg($"[Debug]   {propSig}");
+                    }
+
+                    var propertyFields = propertyType.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    debugOutput.AppendLine($"Property Fields ({propertyFields.Length}):");
+                    LoggerInstance.Msg($"[Debug] Property Fields ({propertyFields.Length}):");
+                    foreach (var field in propertyFields)
+                    {
+                        string fieldSig = $"{field.FieldType.Name} {field.Name}";
+                        debugOutput.AppendLine($"  {fieldSig}");
+                        LoggerInstance.Msg($"[Debug]   {fieldSig}");
+                    }
+                }
+
+                // Speak all debug output at once
+                SpeakText(debugOutput.ToString());
             }
-            catch
+            catch (System.Exception ex)
             {
-                // Entity has been destroyed or is otherwise invalid
-                return false;
+                LoggerInstance.Error($"[Debug] Error getting selected UI element: {ex.Message}");
+                SpeakText("Error getting debug info");
             }
+        }
+
+        /// <summary>
+        /// Gets the full hierarchy path of a GameObject for debugging.
+        /// </summary>
+        private string GetGameObjectPath(UnityEngine.GameObject obj)
+        {
+            string path = obj.name;
+            var parent = obj.transform.parent;
+            while (parent != null)
+            {
+                path = parent.name + "/" + path;
+                parent = parent.parent;
+            }
+            return path;
         }
 
         /// <summary>

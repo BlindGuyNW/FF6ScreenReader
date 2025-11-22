@@ -14,6 +14,7 @@ using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.Config
 using ConfigKeysSettingController = Il2CppLast.UI.KeyInput.ConfigKeysSettingController;
 using ConfigControllCommandController = Il2CppLast.UI.KeyInput.ConfigControllCommandController;
 using MessageManager = Il2CppLast.Management.MessageManager;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -846,21 +847,21 @@ namespace FFVI_ScreenReader.Menus
                             }
 
                             // Last resort: Get text components but avoid values
-                            var texts = menuItem.GetComponentsInChildren<UnityEngine.UI.Text>();
-                            foreach (var text in texts)
+                            // Use non-allocating search for first valid text that isn't a value
+                            var foundText = FindFirstText(menuItem, t =>
                             {
-                                if (!string.IsNullOrEmpty(text.text?.Trim()))
-                                {
-                                    var textValue = text.text.Trim();
-                                    // Skip if it looks like a value (number, percentage, On/Off)
-                                    if (!System.Text.RegularExpressions.Regex.IsMatch(textValue, @"^\d+%?$|^On$|^Off$|^Active$|^Wait$"))
-                                    {
-                                        // This is likely the menu option name
-                                        string menuText = textValue;
-                                        MelonLogger.Msg($"Got text from Text component: '{menuText}'");
-                                        return menuText;
-                                    }
-                                }
+                                if (string.IsNullOrEmpty(t.text?.Trim()))
+                                    return false;
+                                var textValue = t.text.Trim();
+                                // Skip if it looks like a value (number, percentage, On/Off)
+                                return !System.Text.RegularExpressions.Regex.IsMatch(textValue, @"^\d+%?$|^On$|^Off$|^Active$|^Wait$");
+                            });
+
+                            if (foundText != null)
+                            {
+                                string menuText = foundText.text.Trim();
+                                MelonLogger.Msg($"Got text from Text component: '{menuText}'");
+                                return menuText;
                             }
                         }
                         break;

@@ -18,8 +18,11 @@ The architecture has evolved from a monolithic FFVI_ScreenReader.cs to a modular
 
 The codebase is organized into the following directories:
 
-**Core/**: Main mod entry point
-- `FFVI_ScreenReaderMod.cs`: Main mod class inheriting from `MelonMod`. Handles initialization, hotkeys, and entity cycling.
+**Core/**: Main mod entry point and entity management
+- `FFVI_ScreenReaderMod.cs`: Main mod class inheriting from `MelonMod`. Handles initialization, preferences, and coordinates between components.
+- `InputManager.cs`: Manages all keyboard input detection and hotkey routing.
+- `EntityCache.cs`: Registry of all navigable entities in the world. Tracks additions/removals and fires events.
+- `EntityNavigator.cs`: Manages navigation through a filtered/sorted entity list. Handles cycling and pathfinding filter.
 
 **Patches/**: Harmony patches that intercept game methods
 - `CursorNavigationPatches.cs`: Patches `Cursor.NextIndex/PrevIndex` for fallback menu navigation
@@ -40,7 +43,9 @@ The codebase is organized into the following directories:
 - `SaveSlotReader.cs`: Reads save slot information
 
 **Field/**: Field map navigation and entity detection
-- `FieldNavigationHelper.cs`: Pathfinding and entity scanning for field map navigation
+- `FieldNavigationHelper.cs`: Pathfinding and raw entity retrieval from game world
+- `EntityFactory.cs`: Creates NavigableEntity wrappers from game FieldEntity objects
+- `NavigableEntity.cs`: Base class and subclasses for typed entities (NPCs, chests, exits, etc.)
 - `MapNameResolver.cs`: Resolves map IDs to friendly names
 
 **Utils/**: Utility classes
@@ -124,15 +129,130 @@ Config menus use `ConfigCommandController` with type-specific UI roots that togg
 - **Gamepad settings**: Only announce action name (button sprites aren't text-readable)
 - Both use the same controller class (`ConfigKeysSettingController`) but different icon controllers
 
+### Entity Management Architecture
+
+The entity management system uses a **registry + filtered view** pattern with event-driven updates:
+
+#### EntityCache (Registry Pattern)
+- **Purpose**: Maintains the authoritative registry of ALL entities in the world
+- **Data Structure**: `Dictionary<FieldEntity, NavigableEntity>` for O(1) lookups
+- **Scanning Strategy**: Incremental - only processes adds/removes, not full rebuilds
+- **Events**: Fires `OnEntityAdded` and `OnEntityRemoved` when entities appear/disappear
+- **No Filtering**: Stores everything; no category or distance filtering
+
+**How scanning works:**
+```csharp
+// Every N seconds (default 5s)
+1. Get all FieldEntity objects from game: FieldNavigationHelper.GetAllFieldEntities()
+2. Convert to HashSet for O(1) lookups
+3. REMOVE phase: Find entities in map but not in new list → fire OnEntityRemoved
+4. ADD phase: Find entities in new list but not in map → wrap with EntityFactory → fire OnEntityAdded
+```
+
+**Key methods:**
+- `Update()`: Called every frame, handles periodic scanning based on timer
+- `Scan()`: Performs the incremental add/remove check
+- `ForceScan()`: Bypasses timer for immediate scan
+
+#### EntityNavigator (Filtered View)
+- **Purpose**: Maintains a filtered, sorted navigation list for the player to cycle through
+- **Data Structure**: `List<NavigableEntity>` (own copy, not reference to cache)
+- **Selection**: Stores `selectedEntity` reference (NOT index) to survive list reordering
+- **Subscribes to**: EntityCache events to stay in sync
+- **Filters**: Category, MapExit deduplication, Pathfinding (during cycling only)
+
+**How filtering works:**
+```csharp
+// When cache fires OnEntityAdded:
+1. Check if entity passes category filter
+2. If yes, insert into navigationList using insertion sort (O(n))
+3. Keep list sorted by distance from player
+
+// When cache fires OnEntityRemoved:
+1. Remove entity from navigationList
+2. If it was selectedEntity, clear selection
+```
+
+**When full rebuild happens:**
+- Category changes (e.g., All → Chests)
+- Map exit filter toggles on/off
+- Manual call to `RebuildNavigationList()`
+
+**During rebuild:**
+```csharp
+1. Clear navigationList
+2. Iterate through cache.Entities
+3. Apply category filter
+4. Apply map exit deduplication (if enabled)
+5. Sort entire list by distance (O(n log n))
+6. Restore selectedEntity if still in list
+```
+
+**Why reference-based selection?**
+- **Bug fix**: Prevents stale indices when list reorders (entities move, player moves)
+- **Survives rescans**: Entity reference stays valid even if list position changes
+- **CurrentIndex property**: Dynamically calculates index via `navigationList.IndexOf(selectedEntity)`
+
+#### FFVI_ScreenReaderMod (Orchestrator)
+- **Coordinates** between EntityCache, EntityNavigator, InputManager
+- **Handles** preferences (loads/saves filter settings)
+- **Routes** hotkey actions to appropriate component
+- **Announces** entity info and navigation results via TolkWrapper
+
+**Component interaction:**
+```
+User presses J (cycle previous)
+  ↓
+InputManager.HandleFieldInput() → mod.CyclePrevious()
+  ↓
+mod.CyclePrevious() → entityNavigator.CyclePrevious()
+  ↓
+entityNavigator.CyclePrevious():
+  - Re-sorts list by current distances
+  - Finds current selectedEntity index
+  - Moves to previous entity (with pathfinding filter if enabled)
+  - Updates selectedEntity reference
+  - Returns true/false
+  ↓
+mod.CyclePrevious() checks return value:
+  - If true: calls mod.AnnounceEntityOnly()
+  - If false: announces "No entities nearby" or "No pathable entities"
+  ↓
+mod.AnnounceEntityOnly():
+  - Gets selectedEntity from navigator
+  - Runs pathfinding check
+  - Formats description with distance/direction
+  - Calls SpeakText()
+```
+
 ### Hotkeys
 
-The mod provides several hotkeys for field map navigation and battle info:
-- **Backslash (`\`)**: Announce current selected entity (NPC, treasure, exit)
-- **Right Bracket (`]`)**: Cycle to next entity
-- **Left Bracket (`[`)**: Cycle to previous entity
-- **Ctrl+Enter**: Auto-navigate to currently selected entity using pathfinding
-- **H**: Announce current character's HP/MP status in battle
+The mod provides several hotkeys for field map navigation and battle info (managed by `InputManager.cs`):
+
+**Field Navigation (when not on status screen):**
+- **J or [**: Cycle to previous entity
+- **L or ]**: Cycle to next entity
+- **K**: Repeat current entity
+- **P or \**: Pathfind to current entity and announce path
+- **Shift+J/[**: Cycle to previous category
+- **Shift+L/]**: Cycle to next category
+- **Shift+K or 0**: Reset to "All" category
+- **- (Minus)**: Cycle to previous category
+- **= (Equals)**: Cycle to next category
+- **Shift+P/\**: Toggle pathfinding filter on/off
+- **M**: Announce current map name
+- **Shift+M**: Toggle map exit filter (deduplication)
+
+**Status Screen (when active):**
+- **J or [**: Announce physical stats
+- **L or ]**: Announce magical stats
+
+**Global Hotkeys (work everywhere):**
+- **Ctrl+Arrow Keys**: Teleport one cell in arrow direction relative to current entity
+- **H**: Announce airship heading (if on airship) or character HP/MP (if in battle)
 - **G**: Announce current gil amount
+- **T**: Announce active timers
+- **Shift+T**: Freeze/resume timers
 
 ### Coroutine Management
 
@@ -159,26 +279,51 @@ Decompiled source is available in `/home/zkline/ffpr/ff6/` for reference when de
 ## Build and Deployment
 
 ### Build Commands
+
+**Windows (MSYS/Git Bash/Command Prompt):**
 ```bash
-# Build and deploy mod (recommended)
+cd FFVI_Mod
+./build_and_deploy.bat
+```
+
+**Linux/WSL:**
+```bash
 cd FFVI_Mod
 ./build_and_deploy.sh
-
-# Manual build only
-dotnet build FFVI_ScreenReader.csproj --configuration Release
-
-# Manual deployment after build
-cp bin/Release/net6.0/FFVI_ScreenReader.dll "/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/"
 ```
+
+**Manual build only (all platforms):**
+```bash
+dotnet build FFVI_ScreenReader.csproj --configuration Release
+```
+
+**What the build script does:**
+1. Cleans previous build artifacts (bin/ and obj/ directories)
+2. Builds the project using `dotnet build` in Release configuration
+3. Verifies the DLL was created at `bin/Release/net6.0/FFVI_ScreenReader.dll`
+4. Creates the Mods directory if it doesn't exist
+5. Copies the DLL to the game's Mods folder
+
+**IMPORTANT:** Always use the build_and_deploy script (`.bat` for Windows, `.sh` for WSL/Linux) instead of running `dotnet build` directly. The script handles deployment automatically.
 
 ### Dependencies Required
 1. **MelonLoader**: Must be installed in the game directory
 2. **Tolk.dll**: Download from https://github.com/dkager/tolk/releases and place in game's main directory (next to the game exe)
 3. **Active Screen Reader**: NVDA, JAWS, or Windows Narrator must be running
 
-### Deployment Path
-The build script automatically copies the compiled DLL to:
-`/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/`
+### Deployment Paths
+
+**Windows:**
+```
+C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VI PR\Mods\
+```
+
+**Linux/WSL:**
+```
+/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/
+```
+
+The build script automatically detects the platform and copies the DLL to the appropriate location.
 
 ## Debugging
 
