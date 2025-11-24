@@ -265,12 +265,6 @@ namespace FFVI_ScreenReader.Core
                     Patches.TimerHelper.AnnounceActiveTimers();
                 }
             }
-
-            // Debug hotkey: Ctrl+I for debug information
-            if (IsCtrlHeld() && Input.GetKeyDown(KeyCode.I))
-            {
-                mod.DebugInfo();
-            }
         }
 
         /// <summary>
