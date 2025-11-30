@@ -10,6 +10,7 @@ using Il2CppSerial.FF6.UI.KeyInput;
 using Il2CppSerial.FF6.Management;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -72,8 +73,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                commandName = System.Text.RegularExpressions.Regex.Replace(commandName, @"<[iI][cC]_[^>]+>", "");
-                commandName = commandName.Trim();
+                commandName = StripIconMarkup(commandName);
 
                 if (string.IsNullOrWhiteSpace(commandName))
                 {
@@ -167,8 +167,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                abilityName = System.Text.RegularExpressions.Regex.Replace(abilityName, @"<[iI][cC]_[^>]+>", "");
-                abilityName = abilityName.Trim();
+                abilityName = StripIconMarkup(abilityName);
 
                 if (string.IsNullOrWhiteSpace(abilityName))
                 {
@@ -224,17 +223,11 @@ namespace FFVI_ScreenReader.Patches
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
-                    string description = messageManager.GetMessage(mesIdDescription);
+                    string description = StripIconMarkup(messageManager.GetMessage(mesIdDescription));
+
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        // Remove icon markup
-                        description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                        description = description.Trim();
-
-                        if (!string.IsNullOrWhiteSpace(description))
-                        {
-                            announcement += $". {description}";
-                        }
+                        announcement += $". {description}";
                     }
                 }
 
@@ -326,8 +319,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                abilityName = System.Text.RegularExpressions.Regex.Replace(abilityName, @"<[iI][cC]_[^>]+>", "");
-                abilityName = abilityName.Trim();
+                abilityName = StripIconMarkup(abilityName);
 
                 if (string.IsNullOrWhiteSpace(abilityName))
                 {
@@ -340,17 +332,11 @@ namespace FFVI_ScreenReader.Patches
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
-                    string description = messageManager.GetMessage(mesIdDescription);
+                    string description = StripIconMarkup(messageManager.GetMessage(mesIdDescription));
+
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        // Remove icon markup
-                        description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                        description = description.Trim();
-
-                        if (!string.IsNullOrWhiteSpace(description))
-                        {
-                            announcement += $". {description}";
-                        }
+                        announcement += $". {description}";
                     }
                 }
 
@@ -448,22 +434,17 @@ namespace FFVI_ScreenReader.Patches
                     {
                         if (contentView.transform != null)
                         {
-                            var textComponents = contentView.transform.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                            foreach (var textComponent in textComponents)
+                            // Use non-allocating search for first valid text
+                            var foundText = FindFirstText(contentView.transform, t =>
+                                t.gameObject.activeInHierarchy &&
+                                !string.IsNullOrWhiteSpace(t.text) &&
+                                t.text.Trim().ToLower() != "new text" &&
+                                !t.text.Trim().StartsWith("menu_"),
+                                includeInactive: false);
+
+                            if (foundText != null)
                             {
-                                if (textComponent != null &&
-                                    textComponent.gameObject.activeInHierarchy &&
-                                    !string.IsNullOrWhiteSpace(textComponent.text))
-                                {
-                                    string text = textComponent.text.Trim();
-                                    if (!string.IsNullOrWhiteSpace(text) &&
-                                        text.ToLower() != "new text" &&
-                                        !text.StartsWith("menu_"))
-                                    {
-                                        announcement = text;
-                                        break;
-                                    }
-                                }
+                                announcement = foundText.text.Trim();
                             }
                         }
                     }
@@ -479,8 +460,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                announcement = System.Text.RegularExpressions.Regex.Replace(announcement, @"<[iI][cC]_[^>]+>", "");
-                announcement = announcement.Trim();
+                announcement = StripIconMarkup(announcement);
 
                 if (string.IsNullOrWhiteSpace(announcement))
                 {
@@ -535,24 +515,17 @@ namespace FFVI_ScreenReader.Patches
                     var view = __instance.view;
                     if (view != null && view.transform != null)
                     {
-                        // Search for text components in the view hierarchy
-                        var textComponents = view.transform.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                        foreach (var textComponent in textComponents)
+                        // Use non-allocating search for first valid text
+                        var foundText = FindFirstText(view.transform, t =>
+                            t.gameObject.activeInHierarchy &&
+                            !string.IsNullOrWhiteSpace(t.text) &&
+                            t.text.Trim().ToLower() != "new text" &&
+                            !t.text.Trim().StartsWith("menu_"),
+                            includeInactive: false);
+
+                        if (foundText != null)
                         {
-                            if (textComponent != null &&
-                                textComponent.gameObject.activeInHierarchy &&
-                                !string.IsNullOrWhiteSpace(textComponent.text))
-                            {
-                                string text = textComponent.text.Trim();
-                                if (!string.IsNullOrWhiteSpace(text) &&
-                                    text.ToLower() != "new text" &&
-                                    !text.StartsWith("menu_") &&
-                                    text.Length > 0)
-                                {
-                                    announcement = text;
-                                    break;
-                                }
-                            }
+                            announcement = foundText.text.Trim();
                         }
                     }
                 }
@@ -567,8 +540,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                announcement = System.Text.RegularExpressions.Regex.Replace(announcement, @"<[iI][cC]_[^>]+>", "");
-                announcement = announcement.Trim();
+                announcement = StripIconMarkup(announcement);
 
                 if (string.IsNullOrWhiteSpace(announcement))
                 {
@@ -646,8 +618,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup
-                esperName = System.Text.RegularExpressions.Regex.Replace(esperName, @"<[iI][cC]_[^>]+>", "");
-                esperName = esperName.Trim();
+                esperName = StripIconMarkup(esperName);
 
                 if (string.IsNullOrWhiteSpace(esperName))
                 {
@@ -689,10 +660,7 @@ namespace FFVI_ScreenReader.Patches
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(magicStoneData.Description))
                 {
-                    string description = magicStoneData.Description.Trim();
-                    // Remove icon markup
-                    description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                    description = description.Trim();
+                    string description = StripIconMarkup(magicStoneData.Description);
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
@@ -793,7 +761,7 @@ namespace FFVI_ScreenReader.Patches
                 string esperName = magicStoneData.Name;
                 if (!string.IsNullOrWhiteSpace(esperName))
                 {
-                    esperName = System.Text.RegularExpressions.Regex.Replace(esperName, @"<[iI][cC]_[^>]+>", "").Trim();
+                    esperName = StripIconMarkup(esperName);
                     MelonLogger.Msg($"[Esper Show] Opening details for: {esperName}");
                 }
 
@@ -851,7 +819,7 @@ namespace FFVI_ScreenReader.Patches
                             else
                             {
                                 // Remove icon markup
-                                characterName = System.Text.RegularExpressions.Regex.Replace(characterName, @"<[iI][cC]_[^>]+>", "").Trim();
+                                characterName = StripIconMarkup(characterName);
                             }
 
                             // Check if it's the currently selected character
@@ -882,8 +850,8 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(statName) && !string.IsNullOrWhiteSpace(statValue))
                     {
-                        statName = System.Text.RegularExpressions.Regex.Replace(statName, @"<[iI][cC]_[^>]+>", "").Trim();
-                        statValue = System.Text.RegularExpressions.Regex.Replace(statValue, @"<[iI][cC]_[^>]+>", "").Trim();
+                        statName = StripIconMarkup(statName);
+                        statValue = StripIconMarkup(statValue);
 
                         if (!string.IsNullOrWhiteSpace(statName) && !string.IsNullOrWhiteSpace(statValue))
                         {
@@ -931,11 +899,11 @@ namespace FFVI_ScreenReader.Patches
 
                             if (!string.IsNullOrWhiteSpace(abilityName))
                             {
-                                abilityName = System.Text.RegularExpressions.Regex.Replace(abilityName, @"<[iI][cC]_[^>]+>", "").Trim();
+                                abilityName = StripIconMarkup(abilityName);
 
                                 if (!string.IsNullOrWhiteSpace(apCost))
                                 {
-                                    apCost = System.Text.RegularExpressions.Regex.Replace(apCost, @"<[iI][cC]_[^>]+>", "").Trim();
+                                    apCost = StripIconMarkup(apCost);
                                     abilities.Add($"{abilityName} {apCost}");
                                 }
                                 else

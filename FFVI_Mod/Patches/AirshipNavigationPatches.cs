@@ -49,7 +49,7 @@ namespace FFVI_ScreenReader.Patches
                     }
 
                     // Check direction changes using the bird camera rotation
-                    var fieldMap = UnityEngine.Object.FindObjectOfType<FieldMap>();
+                    var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                     if (fieldMap != null && fieldMap.fieldController != null)
                     {
                         float rotationZ = fieldMap.fieldController.GetZAxisRotateBirdCamera();
@@ -96,7 +96,7 @@ namespace FFVI_ScreenReader.Patches
                     }
 
                     // Get current altitude from FieldController
-                    var fieldMap = UnityEngine.Object.FindObjectOfType<FieldMap>();
+                    var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                     if (fieldMap == null || fieldMap.fieldController == null)
                     {
                         return;
@@ -160,7 +160,7 @@ namespace FFVI_ScreenReader.Patches
             try
             {
                 // Get field map and controller
-                var fieldMap = UnityEngine.Object.FindObjectOfType<FieldMap>();
+                var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                 if (fieldMap == null || fieldMap.fieldController == null)
                 {
                     return;

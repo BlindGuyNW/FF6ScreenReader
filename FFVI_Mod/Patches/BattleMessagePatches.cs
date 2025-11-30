@@ -36,8 +36,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
-                string cleanSpeaker = string.Copy(value.Trim());
+                // Create managed string from Il2Cpp string to prevent GC issues
+                string cleanSpeaker = value.Trim();
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -73,8 +73,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
-                string cleanSpeaker = string.Copy(speakerName.Trim());
+                // Create managed string from Il2Cpp string to prevent GC issues
+                string cleanSpeaker = speakerName.Trim();
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -111,8 +111,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
-                string cleanSpeaker = string.Copy(speakerName.Trim());
+                // Create managed string from Il2Cpp string to prevent GC issues
+                string cleanSpeaker = speakerName.Trim();
 
                 // Skip duplicates
                 if (cleanSpeaker == lastSpeaker)
@@ -152,8 +152,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
-                string cleanMessage = string.Copy(message.Trim());
+                // Create managed string from Il2Cpp string to prevent GC issues
+                string cleanMessage = message.Trim();
 
                 // Skip exact duplicates
                 if (cleanMessage == lastMessage)
@@ -165,7 +165,7 @@ namespace FFVI_ScreenReader.Patches
                 if (!string.IsNullOrWhiteSpace(lastMessage) && cleanMessage.StartsWith(lastMessage))
                 {
                     // Only announce the new text that was added
-                    string newText = string.Copy(cleanMessage.Substring(lastMessage.Length).Trim());
+                    string newText = cleanMessage.Substring(lastMessage.Length).Trim();
                     if (!string.IsNullOrWhiteSpace(newText))
                     {
                         MelonLogger.Msg($"[MessageWindowView.SetMessage - New] {newText}");
@@ -625,8 +625,8 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // CRITICAL: Create managed copy to prevent Il2Cpp GC crashes
-                string cleanMessage = string.Copy(message.Trim());
+                // Create managed string from Il2Cpp string to prevent GC issues
+                string cleanMessage = message.Trim();
 
                 // Get current time
                 float currentTime = UnityEngine.Time.time;

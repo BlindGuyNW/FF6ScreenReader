@@ -10,6 +10,7 @@ using Il2CppLast.Management;
 using Il2CppSerial.FF6.UI.KeyInput;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -192,8 +193,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
-                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
-                itemName = itemName.Trim();
+                itemName = StripIconMarkup(itemName);
 
                 if (string.IsNullOrWhiteSpace(itemName))
                 {
@@ -228,8 +228,7 @@ namespace FFVI_ScreenReader.Patches
                         if (!string.IsNullOrWhiteSpace(description))
                         {
                             // Remove icon markup
-                            description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                            description = description.Trim();
+                            description = StripIconMarkup(description);
 
                             if (!string.IsNullOrWhiteSpace(description))
                             {
@@ -248,21 +247,16 @@ namespace FFVI_ScreenReader.Patches
                     var view = selectedContent.view;
                     if (view != null && view.transform != null)
                     {
-                        var descriptionTexts = view.transform.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-                        foreach (var text in descriptionTexts)
+                        // Use non-allocating recursive find instead of GetComponentsInChildren
+                        var descText = FindTextInChildren(view.transform, "description_text");
+                        if (descText != null && !string.IsNullOrWhiteSpace(descText.text))
                         {
-                            if (text.gameObject.name == "description_text" && !string.IsNullOrWhiteSpace(text.text))
-                            {
-                                string description = text.text;
-                                // Remove icon markup
-                                description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                                description = description.Trim();
+                            // Remove icon markup
+                            string description = StripIconMarkup(descText.text);
 
-                                if (!string.IsNullOrWhiteSpace(description))
-                                {
-                                    announcement += $", {description}";
-                                }
-                                break;
+                            if (!string.IsNullOrWhiteSpace(description))
+                            {
+                                announcement += $", {description}";
                             }
                         }
                     }
@@ -356,8 +350,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup from name
-                abilityName = System.Text.RegularExpressions.Regex.Replace(abilityName, @"<[iI][cC]_[^>]+>", "");
-                abilityName = abilityName.Trim();
+                abilityName = StripIconMarkup(abilityName);
 
                 if (string.IsNullOrWhiteSpace(abilityName))
                 {
@@ -370,17 +363,11 @@ namespace FFVI_ScreenReader.Patches
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
-                    string description = messageManager.GetMessage(mesIdDescription);
+                    string description = StripIconMarkup(messageManager.GetMessage(mesIdDescription));
+
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        // Remove icon markup
-                        description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                        description = description.Trim();
-
-                        if (!string.IsNullOrWhiteSpace(description))
-                        {
-                            announcement += $", {description}";
-                        }
+                        announcement += $", {description}";
                     }
                 }
 
@@ -417,71 +404,36 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                MelonLogger.Msg("=== SpecialAbilityContentListController.SetCursor CALLED ===");
-
-                if (__instance == null)
+                if (__instance == null || targetCursor == null)
                 {
-                    MelonLogger.Msg("DEBUG: __instance is NULL");
                     return;
                 }
-
-                if (targetCursor == null)
-                {
-                    MelonLogger.Msg("DEBUG: targetCursor is NULL");
-                    return;
-                }
-
-                MelonLogger.Msg($"DEBUG: __instance={__instance}, targetCursor={targetCursor}");
 
                 // Get the content list (contains BattleSpecialInfomationContentController items)
                 var contentList = __instance.contentList;
-                MelonLogger.Msg($"DEBUG: contentList={contentList}, Count={contentList?.Count ?? -1}");
-
                 if (contentList == null || contentList.Count == 0)
                 {
-                    MelonLogger.Msg("DEBUG: contentList is NULL or empty");
                     return;
                 }
 
                 int index = targetCursor.Index;
-                MelonLogger.Msg($"DEBUG: Cursor index={index}");
-
                 if (index < 0 || index >= contentList.Count)
                 {
-                    MelonLogger.Msg($"DEBUG: Index {index} out of range (0-{contentList.Count - 1})");
                     return;
                 }
 
                 // Get the selected content controller
                 var selectedContent = contentList[index];
-                MelonLogger.Msg($"DEBUG: selectedContent={selectedContent}");
-
                 if (selectedContent == null)
                 {
-                    MelonLogger.Msg("DEBUG: selectedContent is NULL");
                     return;
                 }
 
                 // Get the ability data
                 var abilityData = selectedContent.Data;
-                MelonLogger.Msg($"DEBUG: abilityData={abilityData}");
-
                 if (abilityData == null)
                 {
-                    MelonLogger.Msg("DEBUG: abilityData (Data property) is NULL - might be item-based instead");
-
-                    // Try ItemData instead
-                    var itemData = selectedContent.ItemData;
-                    MelonLogger.Msg($"DEBUG: itemData={itemData}");
-
-                    if (itemData == null)
-                    {
-                        MelonLogger.Msg("DEBUG: Both Data and ItemData are NULL");
-                        return;
-                    }
-
-                    // Use itemData path (not implemented yet, just logging)
-                    MelonLogger.Msg("DEBUG: Found ItemData, but not handling this case yet");
+                    // Try ItemData instead (not implemented yet)
                     return;
                 }
 
@@ -508,8 +460,7 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Remove icon markup from name
-                toolName = System.Text.RegularExpressions.Regex.Replace(toolName, @"<[iI][cC]_[^>]+>", "");
-                toolName = toolName.Trim();
+                toolName = StripIconMarkup(toolName);
 
                 if (string.IsNullOrWhiteSpace(toolName))
                 {
@@ -522,17 +473,11 @@ namespace FFVI_ScreenReader.Patches
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
-                    string description = messageManager.GetMessage(mesIdDescription);
+                    string description = StripIconMarkup(messageManager.GetMessage(mesIdDescription));
+
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        // Remove icon markup
-                        description = System.Text.RegularExpressions.Regex.Replace(description, @"<[iI][cC]_[^>]+>", "");
-                        description = description.Trim();
-
-                        if (!string.IsNullOrWhiteSpace(description))
-                        {
-                            announcement += $", {description}";
-                        }
+                        announcement += $", {description}";
                     }
                 }
 
@@ -548,7 +493,7 @@ namespace FFVI_ScreenReader.Patches
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Error in SpecialAbilityContentListController.SelectContent patch: {ex.Message}");
+                MelonLogger.Warning($"Error in SpecialAbilityContentListController.SetCursor patch: {ex.Message}");
             }
         }
     }

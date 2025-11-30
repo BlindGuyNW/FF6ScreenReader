@@ -8,6 +8,7 @@ using Il2CppLast.UI.KeyInput;
 using Il2CppLast.Management;
 using Il2CppLast.Systems;
 using FFVI_ScreenReader.Core;
+using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -56,8 +57,7 @@ namespace FFVI_ScreenReader.Patches
                                 if (string.IsNullOrEmpty(itemName)) continue;
 
                                 // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
-                                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
-                                itemName = itemName.Trim();
+                                itemName = StripIconMarkup(itemName);
 
                                 if (!string.IsNullOrEmpty(itemName))
                                 {
@@ -202,8 +202,7 @@ namespace FFVI_ScreenReader.Patches
                                 if (string.IsNullOrEmpty(itemName)) continue;
 
                                 // Remove icon markup from name (e.g., <ic_Drag>, <IC_DRAG>)
-                                itemName = System.Text.RegularExpressions.Regex.Replace(itemName, @"<[iI][cC]_[^>]+>", "");
-                                itemName = itemName.Trim();
+                                itemName = StripIconMarkup(itemName);
 
                                 if (!string.IsNullOrEmpty(itemName))
                                 {
