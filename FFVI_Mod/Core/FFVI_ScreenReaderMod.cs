@@ -37,6 +37,9 @@ namespace FFVI_ScreenReader.Core
         // Entity scanning
         private const float ENTITY_SCAN_INTERVAL = 5f;
 
+        // Category count derived from enum for safe cycling
+        private static readonly int CategoryCount = System.Enum.GetValues(typeof(EntityCategory)).Length;
+
         // Pathfinding filter toggle
         private bool filterByPathfinding = false;
 
@@ -330,7 +333,7 @@ namespace FFVI_ScreenReader.Core
         internal void CycleNextCategory()
         {
             // Cycle to next category
-            int nextCategory = ((int)entityNavigator.CurrentCategory + 1) % 6;  // 6 categories total
+            int nextCategory = ((int)entityNavigator.CurrentCategory + 1) % CategoryCount;
             EntityCategory newCategory = (EntityCategory)nextCategory;
 
             // Update navigator category (automatically rebuilds list)
@@ -345,7 +348,7 @@ namespace FFVI_ScreenReader.Core
             // Cycle to previous category
             int prevCategory = (int)entityNavigator.CurrentCategory - 1;
             if (prevCategory < 0)
-                prevCategory = 5;  // Wrap to last category (Vehicles)
+                prevCategory = CategoryCount - 1;
 
             EntityCategory newCategory = (EntityCategory)prevCategory;
 
