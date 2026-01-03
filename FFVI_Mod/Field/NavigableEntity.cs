@@ -386,7 +386,37 @@ namespace FFVI_ScreenReader.Field
 
         protected override string GetDisplayName()
         {
-            return Name;
+            // World of Ruin overworld entrances for Phoenix Cave and Kefka's Tower
+            // show up as event entities on the world map. Their in-game labels can be generic
+            // (e.g., "Transportation of Inaction"), and the footprint is multi-tile.
+            // We use transform.localPosition because that is what the world-map logs report.
+            // The override is constrained to tight coordinate rectangles to avoid affecting other events.
+            string currentName = Name ?? string.Empty;
+
+            try
+            {
+                Vector3 p = (GameEntity != null && GameEntity.transform != null)
+                    ? GameEntity.transform.localPosition
+                    : Position;
+
+                // Overworld entrances sit on a consistent Z plane in logs (~349).
+                if (p.z > 300f && p.z < 400f)
+                {
+                    // Phoenix Cave entrance footprint (World of Ruin).
+                    if (p.x >= -240f && p.x <= -104f && p.y >= -560f && p.y <= -376f)
+                        return "Phoenix Cave";
+
+                    // Kefka's Tower entrance footprint (World of Ruin).
+                    if (p.x >= 96f && p.x <= 224f && p.y >= -1264f && p.y <= -1040f)
+                        return "Kefka's Tower";
+                }
+            }
+            catch
+            {
+                // Fall back to default name
+            }
+
+            return currentName;
         }
 
         protected override string GetEntityTypeName()
