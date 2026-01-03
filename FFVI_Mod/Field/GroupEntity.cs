@@ -132,6 +132,20 @@ namespace FFVI_ScreenReader.Field
             // Get base name from representative
             string baseName = rep.Name;
 
+            // Special-case: world map entrance groups should announce a single friendly label
+            // (and should not append "(X exits)").
+            if (strategy is WorldMapEntranceGroupingStrategy)
+            {
+                if (GroupKey == "WorldMapEntrance_PhoenixCave")
+                    return "Phoenix Cave";
+
+                if (GroupKey == "WorldMapEntrance_KefkasTower")
+                    return "Kefka's Tower";
+
+                // Fallback to representative name if key is unexpected
+                return baseName;
+            }
+
             // For map exits, use the formatted name
             if (rep is MapExitEntity exit)
             {

@@ -25,6 +25,7 @@ namespace FFVI_ScreenReader.Core
         private CategoryFilter categoryFilter;
         private PathfindingFilter pathfindingFilter;
         private MapExitGroupingStrategy mapExitGroupingStrategy;
+        private WorldMapEntranceGroupingStrategy worldMapEntranceGroupingStrategy;
         private bool filterMapExits = false;
 
         /// <summary>
@@ -97,6 +98,10 @@ namespace FFVI_ScreenReader.Core
             categoryFilter = new CategoryFilter();
             pathfindingFilter = new PathfindingFilter();
             mapExitGroupingStrategy = new MapExitGroupingStrategy();
+            worldMapEntranceGroupingStrategy = new WorldMapEntranceGroupingStrategy();
+
+            // Always group duplicate world map entrance event tiles (Phoenix Cave, Kefka's Tower)
+            cache.EnableGroupingStrategy(worldMapEntranceGroupingStrategy);
 
             // Register entity filters
             entityFilters.Add(categoryFilter);
