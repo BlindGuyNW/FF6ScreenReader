@@ -23,6 +23,8 @@ The codebase is organized into the following directories:
 - `InputManager.cs`: Manages all keyboard input detection and hotkey routing.
 - `EntityCache.cs`: Registry of all navigable entities in the world. Tracks additions/removals and fires events.
 - `EntityNavigator.cs`: Manages navigation through a filtered/sorted entity list. Handles cycling and pathfinding filter.
+- `WaypointManager.cs`: CRUD operations and JSON persistence for user-defined waypoints. Stores in `UserData/ffvi_waypoints.json`.
+- `WaypointNavigator.cs`: Waypoint cycling and category filtering. Separate from EntityNavigator due to waypoint-specific category system.
 
 **Patches/**: Harmony patches that intercept game methods
 - `CursorNavigationPatches.cs`: Patches `Cursor.NextIndex/PrevIndex` for fallback menu navigation
@@ -47,6 +49,7 @@ The codebase is organized into the following directories:
 - `EntityFactory.cs`: Creates NavigableEntity wrappers from game FieldEntity objects
 - `NavigableEntity.cs`: Base class and subclasses for typed entities (NPCs, chests, exits, etc.)
 - `MapNameResolver.cs`: Resolves map IDs to friendly names
+- `WaypointEntity.cs`: NavigableEntity subclass for user-defined waypoints. Includes WaypointCategory enum (Landmarks, AirshipLandings, Miscellaneous).
 
 **Utils/**: Utility classes
 - `TolkWrapper.cs`: Wrapper for Tolk screen reader library

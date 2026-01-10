@@ -176,10 +176,66 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
+        /// Handles waypoint-related input.
+        /// </summary>
+        private void HandleWaypointInput()
+        {
+            // Comma: Cycle waypoints
+            if (Input.GetKeyDown(KeyCode.Comma))
+            {
+                if (IsShiftHeld())
+                {
+                    mod.CyclePreviousWaypointCategory();
+                }
+                else
+                {
+                    mod.CyclePreviousWaypoint();
+                }
+            }
+
+            // Period: Cycle waypoints
+            if (Input.GetKeyDown(KeyCode.Period))
+            {
+                if (IsShiftHeld())
+                {
+                    mod.CycleNextWaypointCategory();
+                }
+                else
+                {
+                    mod.CycleNextWaypoint();
+                }
+            }
+
+            // Slash: Waypoint actions
+            if (Input.GetKeyDown(KeyCode.Slash))
+            {
+                if (IsCtrlHeld() && IsShiftHeld())
+                {
+                    mod.ClearAllWaypointsForMap(); // Double-press confirmation
+                }
+                else if (IsCtrlHeld())
+                {
+                    mod.RemoveCurrentWaypoint();
+                }
+                else if (IsShiftHeld())
+                {
+                    mod.AddNewWaypoint();
+                }
+                else
+                {
+                    mod.PathfindToCurrentWaypoint();
+                }
+            }
+        }
+
+        /// <summary>
         /// Handles global input (works in both field and status screen).
         /// </summary>
         private void HandleGlobalInput()
         {
+            // Handle waypoint hotkeys (works anywhere on field)
+            HandleWaypointInput();
+
             // Hotkey: Ctrl+Arrow to teleport in the direction of the arrow
             if (IsCtrlHeld())
             {
