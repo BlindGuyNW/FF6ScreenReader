@@ -13,7 +13,7 @@ using static FFVI_ScreenReader.Utils.TextUtils;
 namespace FFVI_ScreenReader.Patches
 {
     /// <summary>
-    /// Patches for battle result announcements (XP, gil, level ups)
+    /// Patches for battle result announcements (XP, Magic AP, gil, level ups)
     /// </summary>
 
     [HarmonyPatch(typeof(ResultMenuController), nameof(ResultMenuController.Show))]
@@ -87,21 +87,66 @@ namespace FFVI_ScreenReader.Patches
                         if (charResult == null) continue;
 
                         var afterData = charResult.AfterData;
+                        var beforeData = charResult.BeforData;
                         if (afterData == null) continue;
 
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
+                        // Calculate Magic AP by comparing ALL abilities before vs after
+                        int totalMagicAp = 0;
+                        
+                        // Compare all abilities in afterData with beforeData to find skill level changes
+                        if (beforeData != null && beforeData.OwnedAbilityList != null && 
+                            afterData.OwnedAbilityList != null)
+                        {
+                            foreach (var afterAbility in afterData.OwnedAbilityList)
+                            {
+                                if (afterAbility == null || afterAbility.Ability == null) continue;
+                                
+                                int abilityId = afterAbility.Ability.Id;
+                                int afterSkillLevel = afterAbility.SkillLevel;
+                                
+                                // Find matching ability in before data
+                                for (int i = 0; i < beforeData.OwnedAbilityList.Count; i++)
+                                {
+                                    var beforeAbility = beforeData.OwnedAbilityList[i];
+                                    if (beforeAbility == null || beforeAbility.Ability == null) continue;
+                                    
+                                    if (beforeAbility.Ability.Id == abilityId)
+                                    {
+                                        int beforeSkillLevel = beforeAbility.SkillLevel;
+                                        int skillLevelGain = afterSkillLevel - beforeSkillLevel;
+                                        
+                                        if (skillLevelGain > 0)
+                                        {
+                                            totalMagicAp += skillLevelGain;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Build XP and Magic AP announcement
+                        string progressAnnouncement;
+                        if (totalMagicAp > 0)
+                        {
+                            progressAnnouncement = $"{charName} gained {charExp:N0} XP and {totalMagicAp} Magic AP";
+                        }
+                        else
+                        {
+                            progressAnnouncement = $"{charName} gained {charExp:N0} XP";
+                        }
+
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            messageParts.Add($"{charName} gained {charExp:N0} XP and leveled up to level {newLevel}");
+                            progressAnnouncement += $" and leveled up to level {newLevel}";
                         }
-                        else
-                        {
-                            messageParts.Add($"{charName} gained {charExp:N0} XP");
-                        }
+
+                        messageParts.Add(progressAnnouncement);
 
                         // Check if learned any abilities
                         var learningList = charResult.LearningList;
@@ -142,7 +187,6 @@ namespace FFVI_ScreenReader.Patches
                 string announcement = string.Join(", ", messageParts);
 
                 // Skip if this is a duplicate announcement from the SAME battle
-                // (comparing object reference, not string content)
                 if (data == lastBattleData && announcement == lastAnnouncement)
                 {
                     MelonLogger.Msg($"[Battle Results] Skipping duplicate announcement from Show (same battle)");
@@ -156,13 +200,12 @@ namespace FFVI_ScreenReader.Patches
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Error in ResultMenuController.Show patch: {ex.Message}");
+                MelonLogger.Warning($"Error in ResultMenuController.Show patch: {ex.Message}\n{ex.StackTrace}");
             }
         }
     }
 
     // Patch ShowPointsInit to catch cases where the controller is reused/pooled
-    // and Show() may not be called again
     [HarmonyPatch(typeof(ResultMenuController), nameof(ResultMenuController.ShowPointsInit))]
     public static class ResultMenuController_ShowPointsInit_Patch
     {
@@ -232,21 +275,66 @@ namespace FFVI_ScreenReader.Patches
                         if (charResult == null) continue;
 
                         var afterData = charResult.AfterData;
+                        var beforeData = charResult.BeforData;
                         if (afterData == null) continue;
 
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
+                        // Calculate Magic AP by comparing ALL abilities before vs after
+                        int totalMagicAp = 0;
+                        
+                        // Compare all abilities in afterData with beforeData to find skill level changes
+                        if (beforeData != null && beforeData.OwnedAbilityList != null && 
+                            afterData.OwnedAbilityList != null)
+                        {
+                            foreach (var afterAbility in afterData.OwnedAbilityList)
+                            {
+                                if (afterAbility == null || afterAbility.Ability == null) continue;
+                                
+                                int abilityId = afterAbility.Ability.Id;
+                                int afterSkillLevel = afterAbility.SkillLevel;
+                                
+                                // Find matching ability in before data
+                                for (int i = 0; i < beforeData.OwnedAbilityList.Count; i++)
+                                {
+                                    var beforeAbility = beforeData.OwnedAbilityList[i];
+                                    if (beforeAbility == null || beforeAbility.Ability == null) continue;
+                                    
+                                    if (beforeAbility.Ability.Id == abilityId)
+                                    {
+                                        int beforeSkillLevel = beforeAbility.SkillLevel;
+                                        int skillLevelGain = afterSkillLevel - beforeSkillLevel;
+                                        
+                                        if (skillLevelGain > 0)
+                                        {
+                                            totalMagicAp += skillLevelGain;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Build XP and Magic AP announcement
+                        string progressAnnouncement;
+                        if (totalMagicAp > 0)
+                        {
+                            progressAnnouncement = $"{charName} gained {charExp:N0} XP and {totalMagicAp} Magic AP";
+                        }
+                        else
+                        {
+                            progressAnnouncement = $"{charName} gained {charExp:N0} XP";
+                        }
+
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            messageParts.Add($"{charName} gained {charExp:N0} XP and leveled up to level {newLevel}");
+                            progressAnnouncement += $" and leveled up to level {newLevel}";
                         }
-                        else
-                        {
-                            messageParts.Add($"{charName} gained {charExp:N0} XP");
-                        }
+
+                        messageParts.Add(progressAnnouncement);
 
                         // Check if learned any abilities
                         var learningList = charResult.LearningList;
@@ -287,7 +375,6 @@ namespace FFVI_ScreenReader.Patches
                 string announcement = string.Join(", ", messageParts);
 
                 // Skip if this is a duplicate announcement from the SAME battle
-                // (comparing object reference, not string content)
                 if (data == ResultMenuController_Show_Patch.lastBattleData &&
                     announcement == ResultMenuController_Show_Patch.lastAnnouncement)
                 {
@@ -302,7 +389,7 @@ namespace FFVI_ScreenReader.Patches
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"Error in ResultMenuController.ShowPointsInit patch: {ex.Message}");
+                MelonLogger.Warning($"Error in ResultMenuController.ShowPointsInit patch: {ex.Message}\n{ex.StackTrace}");
             }
         }
     }
