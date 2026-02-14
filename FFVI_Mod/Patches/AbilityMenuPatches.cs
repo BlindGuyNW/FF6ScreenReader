@@ -840,35 +840,7 @@ namespace FFVI_ScreenReader.Patches
 
                 details.Add(equippedStatus);
 
-                // Get stat bonus
-                if (view.parameterNameText != null && view.parameterValueText != null)
-                {
-                    string statName = view.parameterNameText.text;
-                    string statValue = view.parameterValueText.text;
-
-                    MelonLogger.Msg($"[Esper Show Debug] Stat bonus: '{statName}' = '{statValue}'");
-
-                    if (!string.IsNullOrWhiteSpace(statName) && !string.IsNullOrWhiteSpace(statValue))
-                    {
-                        statName = StripIconMarkup(statName);
-                        statValue = StripIconMarkup(statValue);
-
-                        if (!string.IsNullOrWhiteSpace(statName) && !string.IsNullOrWhiteSpace(statValue))
-                        {
-                            details.Add($"Level up bonus: {statName} {statValue}");
-                        }
-                    }
-                }
-                else
-                {
-                    MelonLogger.Msg("[Esper Show Debug] Stat bonus text fields are null");
-                }
-
-                // Calculate skill level from the contents list
-                // For now, skip this - the individual ability AP costs are more useful than an aggregate stat
-                // We'll just rely on the abilities list below which shows each ability's AP cost
-
-                // Get learnable abilities from the contents list
+                // Get learnable abilities from the contents list FIRST
                 var contents = view.Contents;
                 if (contents != null && contents.Count > 0)
                 {
@@ -923,6 +895,31 @@ namespace FFVI_ScreenReader.Patches
                 else
                 {
                     MelonLogger.Msg("[Esper Show Debug] No contents list or empty");
+                }
+
+                // Get stat bonus AFTER abilities list (announced at the end)
+                if (view.parameterValueText != null)
+                {
+                    // Check if the stat bonus UI element is actually active/visible
+                    // If it's hidden, this Esper has no level-up bonus (the text is stale from a previous Esper)
+                    bool isStatBonusActive = view.parameterValueText.gameObject.activeInHierarchy;
+                    string statBonus = view.parameterValueText.text;
+
+                    MelonLogger.Msg($"[Esper Show Debug] Stat bonus active: {isStatBonusActive}, text: '{statBonus}'");
+
+                    if (isStatBonusActive && !string.IsNullOrWhiteSpace(statBonus))
+                    {
+                        statBonus = StripIconMarkup(statBonus);
+
+                        if (!string.IsNullOrWhiteSpace(statBonus))
+                        {
+                            details.Add($"Level up bonus: {statBonus}");
+                        }
+                    }
+                }
+                else
+                {
+                    MelonLogger.Msg("[Esper Show Debug] parameterValueText is null");
                 }
 
                 // Combine all details (equipped status already added at the beginning)
