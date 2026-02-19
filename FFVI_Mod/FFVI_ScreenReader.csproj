@@ -12,12 +12,12 @@
   <!-- Platform-specific game directory paths -->
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <!-- Windows native path -->
-    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VI PR</GameDir>
+    <GameDir>D:\Games\SteamLibrary\steamapps\common\FINAL FANTASY VI PR</GameDir>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
     <!-- WSL/Linux path -->
-    <GameDir>/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR</GameDir>
+    <GameDir>/mnt/d/Games/SteamLibrary/steamapps/common/FINAL FANTASY VI PR</GameDir>
   </PropertyGroup>
 
   <ItemGroup>

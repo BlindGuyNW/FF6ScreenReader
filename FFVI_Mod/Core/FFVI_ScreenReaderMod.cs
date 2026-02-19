@@ -36,6 +36,7 @@ namespace FFVI_ScreenReader.Core
         private EntityNavigator entityNavigator;
         private WaypointManager waypointManager;
         private WaypointNavigator waypointNavigator;
+        private WaypointController waypointController;
 
         // Entity scanning
         private const float ENTITY_SCAN_INTERVAL = 5f;
@@ -84,9 +85,10 @@ namespace FFVI_ScreenReader.Core
             entityNavigator.FilterByPathfinding = filterByPathfinding;
             entityNavigator.FilterMapExits = filterMapExits;
 
-            // Initialize waypoint manager and navigator
+            // Initialize waypoint manager, navigator, and controller
             waypointManager = new WaypointManager();
             waypointNavigator = new WaypointNavigator(waypointManager);
+            waypointController = new WaypointController(waypointManager, waypointNavigator);
 
             // Initialize input manager
             inputManager = new InputManager(this);
@@ -704,205 +706,28 @@ namespace FFVI_ScreenReader.Core
             tolk?.Speak(text, interrupt);
         }
 
+        public static void SpeakTextDelayed(string text, float delay = 0.3f)
+        {
+            CoroutineManager.StartManaged(DelayedSpeech(text, delay));
+        }
+
+        private static System.Collections.IEnumerator DelayedSpeech(string text, float delay)
+        {
+            yield return new UnityEngine.WaitForSeconds(delay);
+            SpeakText(text, interrupt: true);
+        }
+
         #region Waypoint Methods
-
-        /// <summary>
-        /// Gets the current map ID as a string for waypoint storage
-        /// </summary>
-        private string GetCurrentMapIdString()
-        {
-            try
-            {
-                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
-                if (userDataManager != null)
-                {
-                    return userDataManager.CurrentMapId.ToString();
-                }
-            }
-            catch (System.Exception ex)
-            {
-                LoggerInstance.Warning($"Error getting map ID: {ex.Message}");
-            }
-            return "unknown";
-        }
-
-        /// <summary>
-        /// Cycles to the next waypoint and announces it
-        /// </summary>
-        internal void CycleNextWaypoint()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-
-            var waypoint = waypointNavigator.CycleNext();
-            if (waypoint == null)
-            {
-                SpeakText("No waypoints");
-                return;
-            }
-
-            SpeakText(waypointNavigator.FormatCurrentWaypoint());
-        }
-
-        /// <summary>
-        /// Cycles to the previous waypoint and announces it
-        /// </summary>
-        internal void CyclePreviousWaypoint()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-
-            var waypoint = waypointNavigator.CyclePrevious();
-            if (waypoint == null)
-            {
-                SpeakText("No waypoints");
-                return;
-            }
-
-            SpeakText(waypointNavigator.FormatCurrentWaypoint());
-        }
-
-        /// <summary>
-        /// Cycles to the next waypoint category
-        /// </summary>
-        internal void CycleNextWaypointCategory()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.CycleNextCategory(mapId);
-            SpeakText(waypointNavigator.GetCategoryAnnouncement());
-        }
-
-        /// <summary>
-        /// Cycles to the previous waypoint category
-        /// </summary>
-        internal void CyclePreviousWaypointCategory()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.CyclePreviousCategory(mapId);
-            SpeakText(waypointNavigator.GetCategoryAnnouncement());
-        }
-
-        /// <summary>
-        /// Pathfinds to the currently selected waypoint
-        /// </summary>
-        internal void PathfindToCurrentWaypoint()
-        {
-            var waypoint = waypointNavigator.SelectedWaypoint;
-            if (waypoint == null)
-            {
-                SpeakText("No waypoint selected");
-                return;
-            }
-
-            var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
-            if (playerController == null || playerController.fieldPlayer == null || playerController.fieldPlayer.transform == null)
-            {
-                SpeakText("Not in field");
-                return;
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-
-            var pathInfo = Field.FieldNavigationHelper.FindPathTo(
-                playerPos,
-                waypoint.Position,
-                playerController.mapHandle,
-                playerController.fieldPlayer
-            );
-
-            if (pathInfo.Success)
-            {
-                SpeakText($"Path to {waypoint.WaypointName}: {pathInfo.Description}");
-            }
-            else
-            {
-                // Still announce distance and direction even without path
-                string description = waypoint.FormatDescription(playerPos);
-                SpeakText($"No path to {waypoint.WaypointName}. {description}");
-            }
-        }
-
-        /// <summary>
-        /// Adds a new waypoint at the player's current position
-        /// </summary>
-        internal void AddNewWaypoint()
-        {
-            var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
-            if (playerController == null || playerController.fieldPlayer == null || playerController.fieldPlayer.transform == null)
-            {
-                SpeakText("Not in field");
-                return;
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            string mapId = GetCurrentMapIdString();
-
-            // Determine category - use current filter unless it's "All"
-            var category = waypointNavigator.CurrentCategory;
-            if (category == Field.WaypointCategory.All)
-            {
-                category = Field.WaypointCategory.Miscellaneous;
-            }
-
-            // Generate auto-name
-            string name = waypointManager.GetNextWaypointName(mapId);
-
-            var waypoint = waypointManager.AddWaypoint(name, playerPos, mapId, category);
-            waypointNavigator.RefreshList(mapId);
-
-            string categoryName = Field.WaypointEntity.GetCategoryDisplayName(category);
-            SpeakText($"Added {name} as {categoryName}");
-        }
-
-        /// <summary>
-        /// Removes the currently selected waypoint
-        /// </summary>
-        internal void RemoveCurrentWaypoint()
-        {
-            var waypoint = waypointNavigator.SelectedWaypoint;
-            if (waypoint == null)
-            {
-                SpeakText("No waypoint selected");
-                return;
-            }
-
-            string name = waypoint.WaypointName;
-            waypointManager.RemoveWaypoint(waypoint.WaypointId);
-
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-            waypointNavigator.ClearSelection();
-
-            SpeakText($"Removed {name}");
-        }
-
-        /// <summary>
-        /// Clears all waypoints for the current map (with double-press confirmation)
-        /// </summary>
-        internal void ClearAllWaypointsForMap()
-        {
-            string mapId = GetCurrentMapIdString();
-
-            if (waypointManager.ClearMapWaypoints(mapId, out int count))
-            {
-                waypointNavigator.RefreshList(mapId);
-                waypointNavigator.ClearSelection();
-
-                if (count > 0)
-                {
-                    SpeakText($"Cleared {count} waypoints from map");
-                }
-                else
-                {
-                    SpeakText("No waypoints to clear");
-                }
-            }
-            else
-            {
-                SpeakText($"Press again within 2 seconds to clear {count} waypoints");
-            }
-        }
-
+        internal void CycleNextWaypoint() => waypointController.CycleNextWaypoint();
+        internal void CyclePreviousWaypoint() => waypointController.CyclePreviousWaypoint();
+        internal void CycleNextWaypointCategory() => waypointController.CycleNextWaypointCategory();
+        internal void CyclePreviousWaypointCategory() => waypointController.CyclePreviousWaypointCategory();
+        internal void PathfindToCurrentWaypoint() => waypointController.PathfindToCurrentWaypoint();
+        internal void AddNewWaypoint() => waypointController.AddNewWaypoint();
+        internal void AddNewWaypointWithNaming() => waypointController.AddNewWaypointWithNaming();
+        internal void RenameCurrentWaypoint() => waypointController.RenameCurrentWaypoint();
+        internal void RemoveCurrentWaypoint() => waypointController.RemoveCurrentWaypoint();
+        internal void ClearAllWaypointsForMap() => waypointController.ClearAllWaypointsForMap();
         #endregion
     }
 }

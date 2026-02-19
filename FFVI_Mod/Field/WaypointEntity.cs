@@ -10,9 +10,10 @@ namespace FFVI_ScreenReader.Field
     public enum WaypointCategory
     {
         All = 0,           // Filter only - shows all waypoints
-        Landmarks = 1,     // Towns, dungeons, notable locations
-        AirshipLandings = 2, // Airship landing zones
-        Miscellaneous = 3  // Default category for new waypoints
+        Docks = 1,         // Ship/boat docking locations
+        Landmarks = 2,     // Towns, dungeons, notable locations
+        AirshipLandings = 3, // Airship landing zones
+        Miscellaneous = 4  // Default category for new waypoints
     }
 
     /// <summary>
@@ -71,6 +72,8 @@ namespace FFVI_ScreenReader.Field
         {
             switch (category)
             {
+                case WaypointCategory.Docks:
+                    return "Dock";
                 case WaypointCategory.Landmarks:
                     return "Landmark";
                 case WaypointCategory.AirshipLandings:
@@ -87,7 +90,7 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public static string[] GetCategoryNames()
         {
-            return new string[] { "All", "Landmarks", "Airship Landings", "Miscellaneous" };
+            return new string[] { "All", "Docks", "Landmarks", "Airship Landings", "Miscellaneous" };
         }
     }
 }

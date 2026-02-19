@@ -23,6 +23,10 @@ namespace FFVI_ScreenReader.Core
         /// </summary>
         public void Update()
         {
+            // Handle modal dialogs (consume all input when open)
+            if (ConfirmationDialog.HandleInput()) return;
+            if (TextInputWindow.HandleInput()) return;
+
             // Early exit if no keys pressed this frame - avoids expensive FindObjectOfType calls
             if (!Input.anyKeyDown)
             {
@@ -193,10 +197,14 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // Period: Cycle waypoints
+            // Period: Cycle waypoints or rename
             if (Input.GetKeyDown(KeyCode.Period))
             {
-                if (IsShiftHeld())
+                if (IsCtrlHeld())
+                {
+                    mod.RenameCurrentWaypoint();
+                }
+                else if (IsShiftHeld())
                 {
                     mod.CycleNextWaypointCategory();
                 }
@@ -211,7 +219,7 @@ namespace FFVI_ScreenReader.Core
             {
                 if (IsCtrlHeld() && IsShiftHeld())
                 {
-                    mod.ClearAllWaypointsForMap(); // Double-press confirmation
+                    mod.ClearAllWaypointsForMap();
                 }
                 else if (IsCtrlHeld())
                 {
@@ -219,7 +227,7 @@ namespace FFVI_ScreenReader.Core
                 }
                 else if (IsShiftHeld())
                 {
-                    mod.AddNewWaypoint();
+                    mod.AddNewWaypointWithNaming();
                 }
                 else
                 {

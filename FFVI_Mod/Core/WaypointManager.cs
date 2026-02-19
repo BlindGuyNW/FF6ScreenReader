@@ -85,11 +85,6 @@ namespace FFVI_ScreenReader.Core
         private WaypointFileData fileData;
         private Dictionary<string, WaypointEntity> waypointEntities = new Dictionary<string, WaypointEntity>();
 
-        // Confirmation state for clear all
-        private float lastClearAttemptTime = 0f;
-        private string lastClearAttemptMapId = null;
-        private const float CLEAR_CONFIRMATION_WINDOW = 2.0f;
-
         public WaypointManager()
         {
             LoadWaypoints();
@@ -213,50 +208,70 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
-        /// Clears all waypoints for a map. Returns false if confirmation is needed.
+        /// Renames a waypoint by ID
         /// </summary>
-        public bool ClearMapWaypoints(string mapId, out int count)
+        public bool RenameWaypoint(string waypointId, string newName)
         {
-            count = GetWaypointsForMap(mapId).Count;
+            if (string.IsNullOrWhiteSpace(newName))
+                return false;
+
+            if (!waypointEntities.TryGetValue(waypointId, out var entity))
+                return false;
+
+            string mapId = entity.MapId;
+
+            // Update in file data
+            if (fileData.waypoints.ContainsKey(mapId))
+            {
+                var waypointData = fileData.waypoints[mapId].FirstOrDefault(w => w.id == waypointId);
+                if (waypointData != null)
+                {
+                    waypointData.name = newName;
+                }
+            }
+
+            // Recreate entity with new name (WaypointEntity is immutable)
+            var newEntity = new WaypointEntity(
+                entity.WaypointId,
+                newName,
+                entity.Position,
+                entity.MapId,
+                entity.WaypointCategoryType
+            );
+            waypointEntities[waypointId] = newEntity;
+
+            SaveWaypoints();
+            return true;
+        }
+
+        /// <summary>
+        /// Clears all waypoints for a map. Returns the count of cleared waypoints.
+        /// </summary>
+        public int ClearMapWaypoints(string mapId)
+        {
+            int count = GetWaypointsForMap(mapId).Count;
 
             if (count == 0)
-                return true; // Nothing to clear
+                return 0;
 
-            float currentTime = Time.time;
-
-            // Check if within confirmation window for same map
-            if (lastClearAttemptMapId == mapId &&
-                currentTime - lastClearAttemptTime < CLEAR_CONFIRMATION_WINDOW)
+            if (fileData.waypoints.ContainsKey(mapId))
             {
-                // Confirmed - actually clear
-                if (fileData.waypoints.ContainsKey(mapId))
+                // Remove entities from cache
+                var toRemove = waypointEntities.Values
+                    .Where(w => w.MapId == mapId)
+                    .Select(w => w.WaypointId)
+                    .ToList();
+
+                foreach (var id in toRemove)
                 {
-                    // Remove entities from cache
-                    var toRemove = waypointEntities.Values
-                        .Where(w => w.MapId == mapId)
-                        .Select(w => w.WaypointId)
-                        .ToList();
-
-                    foreach (var id in toRemove)
-                    {
-                        waypointEntities.Remove(id);
-                    }
-
-                    fileData.waypoints.Remove(mapId);
+                    waypointEntities.Remove(id);
                 }
 
-                SaveWaypoints();
-                lastClearAttemptTime = 0f;
-                lastClearAttemptMapId = null;
-                return true; // Cleared
+                fileData.waypoints.Remove(mapId);
             }
-            else
-            {
-                // First press - request confirmation
-                lastClearAttemptTime = currentTime;
-                lastClearAttemptMapId = mapId;
-                return false; // Needs confirmation
-            }
+
+            SaveWaypoints();
+            return count;
         }
 
         /// <summary>
