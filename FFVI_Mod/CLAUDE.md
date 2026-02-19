@@ -283,56 +283,49 @@ Decompiled source is available in `/home/zkline/ffpr/ff6/` for reference when de
 
 ### Build Commands
 
-**Windows (MSYS/Git Bash/Command Prompt):**
-```bash
+```
 cd FFVI_Mod
-./build_and_deploy.bat
+build_and_deploy.bat
 ```
 
-**Linux/WSL:**
-```bash
-cd FFVI_Mod
-./build_and_deploy.sh
+**Manual build only (no deployment):**
 ```
-
-**Manual build only (all platforms):**
-```bash
 dotnet build FFVI_ScreenReader.csproj --configuration Release
 ```
 
-**What the build script does:**
-1. Cleans previous build artifacts (bin/ and obj/ directories)
+**IMPORTANT:** Always use `build_and_deploy.bat` instead of running `dotnet build` directly. The script handles deployment automatically.
+
+### How the build script finds the game
+
+The script auto-detects the game installation by:
+1. Checking the `FFVI_GAME_DIR` environment variable (if set, uses it directly)
+2. Reading the Steam install path from the Windows registry
+3. Checking the default Steam library for the game
+4. Parsing `libraryfolders.vdf` to find additional Steam library folders
+
+To override auto-detection (e.g., non-Steam install), set the environment variable:
+```
+set "FFVI_GAME_DIR=D:\Games\SteamLibrary\steamapps\common\FINAL FANTASY VI PR"
+build_and_deploy.bat
+```
+
+### What the build script does
+1. Locates the game directory (auto-detect or `FFVI_GAME_DIR`)
 2. Builds the project using `dotnet build` in Release configuration
 3. Verifies the DLL was created at `bin/Release/net6.0/FFVI_ScreenReader.dll`
-4. Creates the Mods directory if it doesn't exist
+4. Creates the game's `Mods` directory if it doesn't exist
 5. Copies the DLL to the game's Mods folder
 
-**IMPORTANT:** Always use the build_and_deploy script (`.bat` for Windows, `.sh` for WSL/Linux) instead of running `dotnet build` directly. The script handles deployment automatically.
-
 ### Dependencies Required
-1. **MelonLoader**: Must be installed in the game directory
-2. **Tolk.dll**: Download from https://github.com/dkager/tolk/releases and place in game's main directory (next to the game exe)
-3. **Active Screen Reader**: NVDA, JAWS, or Windows Narrator must be running
-
-### Deployment Paths
-
-**Windows:**
-```
-C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VI PR\Mods\
-```
-
-**Linux/WSL:**
-```
-/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/Mods/
-```
-
-The build script automatically detects the platform and copies the DLL to the appropriate location.
+1. **.NET 6 SDK**: Required by `dotnet build`
+2. **MelonLoader**: Must be installed in the game directory
+3. **Tolk.dll**: Download from https://github.com/dkager/tolk/releases and place in game's main directory (next to the game exe)
+4. **Active Screen Reader**: NVDA, JAWS, or Windows Narrator must be running
 
 ## Debugging
 
 ### Log Files
-MelonLoader logs are located at:
-`/mnt/c/Program Files (x86)/Steam/steamapps/common/FINAL FANTASY VI PR/MelonLoader/Logs/`
+MelonLoader logs are located in the game's `MelonLoader\Logs\` directory (auto-detected by the build script).
 
 Logs are timestamped and new logs are created each game launch.
 

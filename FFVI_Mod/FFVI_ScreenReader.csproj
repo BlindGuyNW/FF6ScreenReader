@@ -9,15 +9,10 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
-  <!-- Platform-specific game directory paths -->
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
-    <!-- Windows native path -->
-    <GameDir>D:\Games\SteamLibrary\steamapps\common\FINAL FANTASY VI PR</GameDir>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
-    <!-- WSL/Linux path -->
-    <GameDir>/mnt/d/Games/SteamLibrary/steamapps/common/FINAL FANTASY VI PR</GameDir>
+  <!-- GameDir is passed in from build_and_deploy.bat via /p:GameDir=...
+       If not provided, fall back to default Steam path. -->
+  <PropertyGroup Condition="'$(GameDir)' == ''">
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VI PR</GameDir>
   </PropertyGroup>
 
   <ItemGroup>
