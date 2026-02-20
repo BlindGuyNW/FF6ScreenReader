@@ -282,15 +282,6 @@ namespace FFVI_ScreenReader.Core
             return GetWaypointsForMap(mapId).Count;
         }
 
-        /// <summary>
-        /// Gets the next auto-generated waypoint name for the map
-        /// </summary>
-        public string GetNextWaypointName(string mapId)
-        {
-            int count = GetWaypointCountForMap(mapId) + 1;
-            return $"Waypoint {count}";
-        }
-
         private void RebuildEntityCache()
         {
             waypointEntities.Clear();

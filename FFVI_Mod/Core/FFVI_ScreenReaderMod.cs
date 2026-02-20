@@ -30,6 +30,8 @@ namespace FFVI_ScreenReader.Core
     /// </summary>
     public class FFVI_ScreenReaderMod : MelonMod
     {
+        internal static FFVI_ScreenReaderMod Instance { get; private set; }
+
         private static TolkWrapper tolk;
         private InputManager inputManager;
         private EntityCache entityCache;
@@ -37,6 +39,7 @@ namespace FFVI_ScreenReader.Core
         private WaypointManager waypointManager;
         private WaypointNavigator waypointNavigator;
         private WaypointController waypointController;
+        private AudioLoopManager audioLoopManager;
 
         // Entity scanning
         private const float ENTITY_SCAN_INTERVAL = 5f;
@@ -50,29 +53,28 @@ namespace FFVI_ScreenReader.Core
         // Map exit filter toggle
         private bool filterMapExits = false;
 
+        // Layer transition filter toggle
+        private bool filterToLayer = false;
+
         // Map transition tracking
         private int lastAnnouncedMapId = -1;
 
-        // Preferences
-        private static MelonPreferences_Category prefsCategory;
-        private static MelonPreferences_Entry<bool> prefPathfindingFilter;
-        private static MelonPreferences_Entry<bool> prefMapExitFilter;
-
         public override void OnInitializeMelon()
         {
+            Instance = this;
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
 
             // Subscribe to scene load events for automatic component caching
             UnityEngine.SceneManagement.SceneManager.sceneLoaded += (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
 
-            // Initialize preferences
-            prefsCategory = MelonPreferences.CreateCategory("FFVI_ScreenReader");
-            prefPathfindingFilter = prefsCategory.CreateEntry<bool>("PathfindingFilter", false, "Pathfinding Filter", "Only show entities with valid paths when cycling");
-            prefMapExitFilter = prefsCategory.CreateEntry<bool>("MapExitFilter", false, "Map Exit Filter", "Filter multiple map exits to the same destination, showing only the closest one");
+            // Initialize centralized preferences and mod menu
+            PreferencesManager.Initialize();
+            ModMenu.Initialize();
 
             // Load saved preferences
-            filterByPathfinding = prefPathfindingFilter.Value;
-            filterMapExits = prefMapExitFilter.Value;
+            filterByPathfinding = PreferencesManager.PathfindingFilterDefault;
+            filterMapExits = PreferencesManager.MapExitFilterDefault;
+            filterToLayer = PreferencesManager.ToLayerFilterDefault;
 
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
@@ -84,11 +86,19 @@ namespace FFVI_ScreenReader.Core
             entityNavigator = new EntityNavigator(entityCache);
             entityNavigator.FilterByPathfinding = filterByPathfinding;
             entityNavigator.FilterMapExits = filterMapExits;
+            entityNavigator.FilterToLayer = filterToLayer;
 
             // Initialize waypoint manager, navigator, and controller
             waypointManager = new WaypointManager();
             waypointNavigator = new WaypointNavigator(waypointManager);
             waypointController = new WaypointController(waypointManager, waypointNavigator);
+
+            // Initialize external sound system
+            Utils.SoundPlayer.Initialize();
+
+            // Initialize audio loop manager
+            audioLoopManager = new AudioLoopManager(entityCache, entityNavigator);
+            audioLoopManager.InitializeFromPreferences();
 
             // Initialize input manager
             inputManager = new InputManager(this);
@@ -99,6 +109,8 @@ namespace FFVI_ScreenReader.Core
             // Unsubscribe from scene load events
             UnityEngine.SceneManagement.SceneManager.sceneLoaded -= (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
 
+            audioLoopManager?.StopAllLoops();
+            Utils.SoundPlayer.Shutdown();
             CoroutineManager.CleanupAll();
             tolk?.Unload();
         }
@@ -391,8 +403,7 @@ namespace FFVI_ScreenReader.Core
             entityNavigator.FilterByPathfinding = filterByPathfinding;
 
             // Save to preferences
-            prefPathfindingFilter.Value = filterByPathfinding;
-            prefsCategory.SaveToFile(false);
+            PreferencesManager.SavePathfindingFilter(filterByPathfinding);
 
             string status = filterByPathfinding ? "on" : "off";
             SpeakText($"Pathfinding filter {status}");
@@ -407,12 +418,49 @@ namespace FFVI_ScreenReader.Core
             entityNavigator.RebuildNavigationList();
 
             // Save to preferences
-            prefMapExitFilter.Value = filterMapExits;
-            prefsCategory.SaveToFile(false);
+            PreferencesManager.SaveMapExitFilter(filterMapExits);
 
             string status = filterMapExits ? "on" : "off";
             SpeakText($"Map exit filter {status}");
         }
+
+        internal void ToggleToLayerFilter()
+        {
+            filterToLayer = !filterToLayer;
+
+            // Update navigator (FilterToLayer setter rebuilds the list)
+            entityNavigator.FilterToLayer = filterToLayer;
+
+            // Save to preferences
+            PreferencesManager.SaveToLayerFilter(filterToLayer);
+
+            string status = filterToLayer ? "on" : "off";
+            SpeakText($"Layer transition filter {status}");
+        }
+
+        // Static accessors for ModMenu bindings
+        public static bool PathfindingFilterEnabled => Instance?.filterByPathfinding ?? false;
+        public static bool MapExitFilterEnabled => Instance?.filterMapExits ?? false;
+        public static bool ToLayerFilterEnabled => Instance?.filterToLayer ?? false;
+
+        // Audio feature static accessors
+        public static bool WallTonesEnabled => AudioLoopManager.Instance?.IsWallTonesEnabled ?? false;
+        public static bool FootstepsEnabled => AudioLoopManager.Instance?.IsFootstepsEnabled ?? false;
+        public static bool AudioBeaconsEnabled => AudioLoopManager.Instance?.IsAudioBeaconsEnabled ?? false;
+        public static bool ExpCounterEnabled => AudioLoopManager.Instance?.IsExpCounterEnabled ?? false;
+
+        // Volume accessors (read from PreferencesManager)
+        public static int WallBumpVolume => PreferencesManager.WallBumpVolume;
+        public static int FootstepVolume => PreferencesManager.FootstepVolume;
+        public static int WallToneVolume => PreferencesManager.WallToneVolume;
+        public static int BeaconVolume => PreferencesManager.BeaconVolume;
+        public static int ExpCounterVolume => PreferencesManager.ExpCounterVolume;
+
+        // Audio toggle delegation methods
+        internal void ToggleWallTones() => audioLoopManager?.ToggleWallTones();
+        internal void ToggleFootsteps() => audioLoopManager?.ToggleFootsteps();
+        internal void ToggleAudioBeacons() => audioLoopManager?.ToggleAudioBeacons();
+        internal void ToggleExpCounter() => audioLoopManager?.ToggleExpCounter();
 
         private void AnnounceCategoryChange()
         {
@@ -723,7 +771,6 @@ namespace FFVI_ScreenReader.Core
         internal void CycleNextWaypointCategory() => waypointController.CycleNextWaypointCategory();
         internal void CyclePreviousWaypointCategory() => waypointController.CyclePreviousWaypointCategory();
         internal void PathfindToCurrentWaypoint() => waypointController.PathfindToCurrentWaypoint();
-        internal void AddNewWaypoint() => waypointController.AddNewWaypoint();
         internal void AddNewWaypointWithNaming() => waypointController.AddNewWaypointWithNaming();
         internal void RenameCurrentWaypoint() => waypointController.RenameCurrentWaypoint();
         internal void RemoveCurrentWaypoint() => waypointController.RemoveCurrentWaypoint();

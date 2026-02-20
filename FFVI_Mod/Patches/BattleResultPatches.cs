@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Linq;
 using HarmonyLib;
 using MelonLoader;
@@ -8,6 +9,7 @@ using Il2CppLast.UI.KeyInput;
 using Il2CppLast.Management;
 using Il2CppLast.Systems;
 using FFVI_ScreenReader.Core;
+using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
 
 namespace FFVI_ScreenReader.Patches
@@ -386,11 +388,33 @@ namespace FFVI_ScreenReader.Patches
                 ResultMenuController_Show_Patch.lastAnnouncement = announcement;
                 MelonLogger.Msg($"[Battle Results ShowPointsInit] {announcement}");
                 FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: false);
+
+                // Start EXP counter beep if enabled
+                if (FFVI_ScreenReaderMod.ExpCounterEnabled)
+                {
+                    SoundPlayer.PlayExpCounter();
+                    // Start a coroutine to stop the counter when the result screen ends
+                    CoroutineManager.StartUntracked(StopExpCounterWhenDone(__instance));
+                }
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in ResultMenuController.ShowPointsInit patch: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// Polls until the result menu controller is no longer active, then stops the EXP counter.
+        /// </summary>
+        private static IEnumerator StopExpCounterWhenDone(ResultMenuController controller)
+        {
+            // Wait for the animation to run
+            while (controller != null && controller.gameObject != null && controller.gameObject.activeInHierarchy)
+            {
+                yield return null;
+            }
+
+            SoundPlayer.StopExpCounter();
         }
     }
 }

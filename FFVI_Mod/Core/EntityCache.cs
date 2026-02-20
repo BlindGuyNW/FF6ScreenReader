@@ -330,6 +330,21 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
+        /// Returns positions of all map exit entities in the cache.
+        /// Used by wall tone loop to suppress tones near exits.
+        /// </summary>
+        public List<Vector3> GetMapExitPositions()
+        {
+            var positions = new List<Vector3>();
+            foreach (var entity in entityMap.Values)
+            {
+                if (entity.Category == EntityCategory.MapExits)
+                    positions.Add(entity.Position);
+            }
+            return positions;
+        }
+
+        /// <summary>
         /// Gets the player's current world position.
         /// </summary>
         private Vector3 GetPlayerPosition()

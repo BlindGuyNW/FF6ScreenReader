@@ -134,7 +134,10 @@ namespace FFVI_ScreenReader.Core
 
             var category = waypointNavigator.CurrentCategory;
             if (category == WaypointCategory.All)
-                category = WaypointCategory.Miscellaneous;
+            {
+                FFVI_ScreenReaderMod.SpeakText("Please select a category.");
+                return;
+            }
 
             TextInputWindow.Open(
                 "Enter waypoint name",
@@ -152,31 +155,6 @@ namespace FFVI_ScreenReader.Core
                     FFVI_ScreenReaderMod.SpeakTextDelayed("Waypoint creation cancelled");
                 }
             );
-        }
-
-        public void AddNewWaypoint()
-        {
-            var playerController = GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
-            if (playerController == null || playerController.fieldPlayer == null || playerController.fieldPlayer.transform == null)
-            {
-                FFVI_ScreenReaderMod.SpeakText("Not in field");
-                return;
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            string mapId = GetCurrentMapIdString();
-
-            var category = waypointNavigator.CurrentCategory;
-            if (category == WaypointCategory.All)
-                category = WaypointCategory.Miscellaneous;
-
-            string name = waypointManager.GetNextWaypointName(mapId);
-
-            waypointManager.AddWaypoint(name, playerPos, mapId, category);
-            waypointNavigator.RefreshList(mapId);
-
-            string categoryName = WaypointEntity.GetCategoryDisplayName(category);
-            FFVI_ScreenReaderMod.SpeakText($"Added {name} as {categoryName}");
         }
 
         public void RenameCurrentWaypoint()

@@ -30,6 +30,9 @@ namespace FFVI_ScreenReader.Core
             if (ConfirmationDialog.HandleInput()) return;
             if (TextInputWindow.HandleInput()) return;
 
+            // Handle mod menu input (uses Win32 GetAsyncKeyState, works without game focus)
+            if (ModMenu.HandleInput()) return;
+
             // Handle item detail navigator (Up/Down navigation, auto-deactivates when screen closes)
             if (Menus.ItemDetailNavigator.IsActive)
             {
@@ -47,6 +50,21 @@ namespace FFVI_ScreenReader.Core
             if (IsInputFieldFocused())
             {
                 // Player is typing text - skip all hotkey processing
+                return;
+            }
+
+            // F8: Open mod menu (blocked during battle)
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                if (FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter != null)
+                {
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                }
+                else
+                {
+                    FFVI_ScreenReaderMod.SpeakText("Mod menu");
+                    ModMenu.Open();
+                }
                 return;
             }
 
@@ -186,6 +204,34 @@ namespace FFVI_ScreenReader.Core
                     // Just P/\ (pathfind to current entity)
                     mod.AnnounceCurrentEntity();
                 }
+            }
+
+            // Audio toggle hotkeys
+            // Quote ('): Toggle footsteps
+            if (Input.GetKeyDown(KeyCode.Quote))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                else
+                    mod.ToggleFootsteps();
+            }
+
+            // Semicolon (;): Toggle wall tones
+            if (Input.GetKeyDown(KeyCode.Semicolon))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                else
+                    mod.ToggleWallTones();
+            }
+
+            // Alpha9 (9): Toggle audio beacons
+            if (Input.GetKeyDown(KeyCode.Alpha9))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                else
+                    mod.ToggleAudioBeacons();
             }
         }
 
@@ -430,6 +476,14 @@ namespace FFVI_ScreenReader.Core
                 MelonLogger.Warning($"Error accessing description text: {ex.Message}");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Checks if the player is currently in battle.
+        /// </summary>
+        private bool IsInBattle()
+        {
+            return FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter != null;
         }
 
         /// <summary>

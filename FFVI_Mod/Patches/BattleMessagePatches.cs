@@ -1004,7 +1004,18 @@ namespace FFVI_ScreenReader.Patches
                                             int currentHP = unitDataInfo.Parameter.CurrentHP;
                                             int maxHP = unitDataInfo.Parameter.ConfirmedMaxHp();
 
-                                            announcement += $", HP {currentHP}/{maxHP}";
+                                            switch (Core.PreferencesManager.EnemyHPDisplay)
+                                            {
+                                                case 0: // Numbers
+                                                    announcement += $", HP {currentHP}/{maxHP}";
+                                                    break;
+                                                case 1: // Percentage
+                                                    int percentage = maxHP > 0 ? (int)Math.Round((double)currentHP / maxHP * 100) : 0;
+                                                    announcement += $", {percentage}% HP";
+                                                    break;
+                                                case 2: // Hidden
+                                                    break;
+                                            }
                                         }
                                     }
                                     catch (Exception hpEx)
