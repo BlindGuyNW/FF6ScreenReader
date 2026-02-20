@@ -33,6 +33,13 @@ namespace FFVI_ScreenReader.Core
             // Handle mod menu input (uses Win32 GetAsyncKeyState, works without game focus)
             if (ModMenu.HandleInput()) return;
 
+            // Handle bestiary detail navigation (Up/Down/Shift/Ctrl+arrows for stat browsing)
+            if (Menus.BestiaryNavigationReader.IsActive)
+            {
+                if (Input.anyKeyDown && HandleBestiaryInput())
+                    return;
+            }
+
             // Handle item detail navigator (Up/Down navigation, auto-deactivates when screen closes)
             if (Menus.ItemDetailNavigator.IsActive)
             {
@@ -371,10 +378,17 @@ namespace FFVI_ScreenReader.Core
                 mod.CyclePreviousCategory();
             }
 
-            // Hotkey: I to announce item/config details
+            // Hotkey: I to announce item/config details, Shift+I for key help tooltips
             if (Input.GetKeyDown(KeyCode.I))
             {
-                HandleItemInfoKey();
+                if (IsShiftHeld())
+                {
+                    Menus.KeyHelpReader.AnnounceKeyHelp();
+                }
+                else
+                {
+                    HandleItemInfoKey();
+                }
             }
 
             // Hotkey: T to announce active timers
@@ -391,6 +405,37 @@ namespace FFVI_ScreenReader.Core
                     Patches.TimerHelper.AnnounceActiveTimers();
                 }
             }
+        }
+
+        /// <summary>
+        /// Handles arrow key input for bestiary detail stat navigation.
+        /// Returns true if input was consumed.
+        /// </summary>
+        private bool HandleBestiaryInput()
+        {
+            if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToBottom();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToNextGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigateNext();
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToTop();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToPreviousGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigatePrevious();
+                return true;
+            }
+
+            return false;
         }
 
         private void HandleItemInfoKey()

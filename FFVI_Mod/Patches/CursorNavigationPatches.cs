@@ -39,6 +39,11 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -62,7 +67,7 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     string parentName = parent.name.ToLower();
-                    if (parentName.Contains("battle_target") || 
+                    if (parentName.Contains("battle_target") ||
                         parentName.Contains("battletarget") ||
                         parentName.Contains("battle_command") ||
                         parentName.Contains("battlecommand") ||
@@ -226,6 +231,11 @@ namespace FFVI_ScreenReader.Patches
                     MelonLogger.Msg("GameCursor transform is null in PrevIndex patch");
                     return;
                 }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
 
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
@@ -415,6 +425,11 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -602,6 +617,11 @@ namespace FFVI_ScreenReader.Patches
                     MelonLogger.Msg("GameCursor transform is null in SkipPrevIndex patch");
                     return;
                 }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
 
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
