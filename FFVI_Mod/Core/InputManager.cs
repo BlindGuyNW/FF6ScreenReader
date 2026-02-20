@@ -14,7 +14,6 @@ namespace FFVI_ScreenReader.Core
     public class InputManager
     {
         private readonly FFVI_ScreenReaderMod mod;
-        private Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController cachedStatusController;
 
         public InputManager(FFVI_ScreenReaderMod mod)
         {
@@ -32,6 +31,13 @@ namespace FFVI_ScreenReader.Core
 
             // Handle mod menu input (uses Win32 GetAsyncKeyState, works without game focus)
             if (ModMenu.HandleInput()) return;
+
+            // Handle status screen navigation (Up/Down/Shift/Ctrl+arrows for stat browsing)
+            if (Menus.StatusNavigationReader.IsActive)
+            {
+                if (Input.anyKeyDown && HandleStatusNavigationInput())
+                    return;
+            }
 
             // Handle bestiary detail navigation (Up/Down/Shift/Ctrl+arrows for stat browsing)
             if (Menus.BestiaryNavigationReader.IsActive)
@@ -75,17 +81,8 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
-            // Check if status details screen is active to route J/L keys appropriately
-            bool statusScreenActive = IsStatusScreenActive();
-
-            if (statusScreenActive)
-            {
-                HandleStatusScreenInput();
-            }
-            else
-            {
-                HandleFieldInput();
-            }
+            // J/L/[/] always route to field input (no more status screen branching)
+            HandleFieldInput();
 
             // Global hotkeys (work in both field and status screen)
             HandleGlobalInput();
@@ -122,39 +119,65 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
-        /// Checks if the status details screen is currently active.
-        /// Uses cached reference to avoid expensive FindObjectOfType calls.
+        /// Handles arrow key input for status screen stat navigation.
+        /// Returns true if input was consumed.
         /// </summary>
-        private bool IsStatusScreenActive()
+        private bool HandleStatusNavigationInput()
         {
-            // Validate cache - check if controller exists and is still valid
-            if (cachedStatusController == null || cachedStatusController.gameObject == null)
+            if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                cachedStatusController = Utils.GameObjectCache.Get<Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController>();
+                if (IsCtrlHeld())
+                    Menus.StatusNavigationReader.JumpToBottom();
+                else if (IsShiftHeld())
+                    Menus.StatusNavigationReader.JumpToNextGroup();
+                else
+                    Menus.StatusNavigationReader.NavigateNext();
+                return true;
             }
 
-            return cachedStatusController != null &&
-                   cachedStatusController.gameObject != null &&
-                   cachedStatusController.gameObject.activeInHierarchy;
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (IsCtrlHeld())
+                    Menus.StatusNavigationReader.JumpToTop();
+                else if (IsShiftHeld())
+                    Menus.StatusNavigationReader.JumpToPreviousGroup();
+                else
+                    Menus.StatusNavigationReader.NavigatePrevious();
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
-        /// Handles input when on the status details screen.
+        /// Handles arrow key input for bestiary detail stat navigation.
+        /// Returns true if input was consumed.
         /// </summary>
-        private void HandleStatusScreenInput()
+        private bool HandleBestiaryInput()
         {
-            // On status screen: J/[ announces physical stats, L/] announces magical stats
-            if (Input.GetKeyDown(KeyCode.J) || Input.GetKeyDown(KeyCode.LeftBracket))
+            if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
-                FFVI_ScreenReaderMod.SpeakText(physicalStats);
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToBottom();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToNextGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigateNext();
+                return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.L) || Input.GetKeyDown(KeyCode.RightBracket))
+            if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
-                FFVI_ScreenReaderMod.SpeakText(magicalStats);
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToTop();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToPreviousGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigatePrevious();
+                return true;
             }
+
+            return false;
         }
 
         /// <summary>
@@ -405,37 +428,6 @@ namespace FFVI_ScreenReader.Core
                     Patches.TimerHelper.AnnounceActiveTimers();
                 }
             }
-        }
-
-        /// <summary>
-        /// Handles arrow key input for bestiary detail stat navigation.
-        /// Returns true if input was consumed.
-        /// </summary>
-        private bool HandleBestiaryInput()
-        {
-            if (Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                if (IsCtrlHeld())
-                    Menus.BestiaryNavigationReader.JumpToBottom();
-                else if (IsShiftHeld())
-                    Menus.BestiaryNavigationReader.JumpToNextGroup();
-                else
-                    Menus.BestiaryNavigationReader.NavigateNext();
-                return true;
-            }
-
-            if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                if (IsCtrlHeld())
-                    Menus.BestiaryNavigationReader.JumpToTop();
-                else if (IsShiftHeld())
-                    Menus.BestiaryNavigationReader.JumpToPreviousGroup();
-                else
-                    Menus.BestiaryNavigationReader.NavigatePrevious();
-                return true;
-            }
-
-            return false;
         }
 
         private void HandleItemInfoKey()

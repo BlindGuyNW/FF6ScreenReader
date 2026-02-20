@@ -1,36 +1,61 @@
+using System;
 using System.Collections.Generic;
-using System.Text;
 using Il2CppSerial.FF6.UI.KeyInput;
 using Il2CppLast.Data.User;
+using MelonLoader;
 using UnityEngine.UI;
+using FFVI_ScreenReader.Patches;
 
 namespace FFVI_ScreenReader.Menus
 {
+    /// <summary>
+    /// Stat groups for organizing FF6 status screen statistics.
+    /// </summary>
+    public enum StatGroup
+    {
+        CharacterInfo,  // Name + Class, Level
+        Progression,    // EXP, Next Level
+        Vitals,         // HP, MP
+        Attributes,     // Strength, Agility, Stamina, Magic
+        CombatStats,    // Attack, Defense, Evasion, Magic Defense, Magic Evasion
+        Details         // Commands, Magicite, At Level Up
+    }
+
+    /// <summary>
+    /// Definition of a single navigable stat on the status screen.
+    /// </summary>
+    public class StatusStatDefinition
+    {
+        public string Name { get; set; }
+        public StatGroup Group { get; set; }
+        public Func<OwnedCharacterData, string> Reader { get; set; }
+
+        public StatusStatDefinition(string name, StatGroup group, Func<OwnedCharacterData, string> reader)
+        {
+            Name = name;
+            Group = group;
+            Reader = reader;
+        }
+    }
+
     /// <summary>
     /// Handles reading character status details from the status menu.
     /// Reads character stats, battle commands, and other status information in a logical order.
     /// </summary>
     public static class StatusDetailsReader
     {
-        // Store the current character data for hotkey access
         private static OwnedCharacterData currentCharacterData = null;
 
-        /// <summary>
-        /// Store character data when status screen is updated.
-        /// Called from SetParameter patch.
-        /// </summary>
         public static void SetCurrentCharacterData(OwnedCharacterData data)
         {
             currentCharacterData = data;
         }
 
-        /// <summary>
-        /// Clear character data when leaving status screen.
-        /// </summary>
         public static void ClearCurrentCharacterData()
         {
             currentCharacterData = null;
         }
+
         /// <summary>
         /// Read all character status information from the status details view.
         /// Returns a formatted string with all relevant information.
@@ -174,7 +199,7 @@ namespace FFVI_ScreenReader.Menus
         /// <summary>
         /// Safely get text from a Text component, returning null if invalid.
         /// </summary>
-        private static string GetTextSafe(Text textComponent)
+        internal static string GetTextSafe(Text textComponent)
         {
             if (textComponent == null)
             {
@@ -189,7 +214,6 @@ namespace FFVI_ScreenReader.Menus
                     return null;
                 }
 
-                // Trim and return
                 return text.Trim();
             }
             catch
@@ -197,84 +221,613 @@ namespace FFVI_ScreenReader.Menus
                 return null;
             }
         }
+    }
+
+    /// <summary>
+    /// Provides arrow-key stat-by-stat navigation through the FF6 status screen.
+    /// 18 stats organized in 6 groups with group jumping support.
+    /// </summary>
+    public static class StatusNavigationReader
+    {
+        private static List<StatusStatDefinition> statList = null;
+        // Group start indices: CharacterInfo=0, Progression=2, Vitals=4, Attributes=6, CombatStats=10, Details=15
+        private static readonly int[] GroupStartIndices = new int[] { 0, 2, 4, 6, 10, 15 };
+        private static readonly string[] GroupNames = new string[]
+        {
+            "Character Info", "Progression", "Vitals", "Attributes", "Combat Stats", "Details"
+        };
 
         /// <summary>
-        /// Read physical combat stats (Strength, Stamina, Defense, Evade).
-        /// Called when user presses [ key on status screen.
+        /// Whether status navigation is currently active and should intercept arrow keys.
         /// </summary>
-        public static string ReadPhysicalStats()
+        public static bool IsActive => statList != null && StatusNavigationTracker.Instance.IsNavigationActive;
+
+        /// <summary>
+        /// Initialize the stat list with all 18 FF6 status screen stats.
+        /// </summary>
+        public static void InitializeStatList()
         {
-            if (currentCharacterData == null || currentCharacterData.parameter == null)
+            if (statList != null) return;
+
+            statList = new List<StatusStatDefinition>();
+
+            // Group 0 - Character Info (indices 0-1)
+            statList.Add(new StatusStatDefinition("Name and Class", StatGroup.CharacterInfo, ReadNameAndClass));
+            statList.Add(new StatusStatDefinition("Level", StatGroup.CharacterInfo, ReadLevel));
+
+            // Group 1 - Progression (indices 2-3) — placed early for quick TNL access
+            statList.Add(new StatusStatDefinition("Experience", StatGroup.Progression, ReadExperience));
+            statList.Add(new StatusStatDefinition("Next Level", StatGroup.Progression, ReadNextLevel));
+
+            // Group 2 - Vitals (indices 4-5)
+            statList.Add(new StatusStatDefinition("HP", StatGroup.Vitals, ReadHP));
+            statList.Add(new StatusStatDefinition("MP", StatGroup.Vitals, ReadMP));
+
+            // Group 3 - Attributes (indices 6-9)
+            statList.Add(new StatusStatDefinition("Strength", StatGroup.Attributes, ReadStrength));
+            statList.Add(new StatusStatDefinition("Agility", StatGroup.Attributes, ReadAgility));
+            statList.Add(new StatusStatDefinition("Stamina", StatGroup.Attributes, ReadStamina));
+            statList.Add(new StatusStatDefinition("Magic", StatGroup.Attributes, ReadMagic));
+
+            // Group 4 - Combat Stats (indices 10-14)
+            statList.Add(new StatusStatDefinition("Attack", StatGroup.CombatStats, ReadAttack));
+            statList.Add(new StatusStatDefinition("Defense", StatGroup.CombatStats, ReadDefense));
+            statList.Add(new StatusStatDefinition("Evasion", StatGroup.CombatStats, ReadEvasion));
+            statList.Add(new StatusStatDefinition("Magic Defense", StatGroup.CombatStats, ReadMagicDefense));
+            statList.Add(new StatusStatDefinition("Magic Evasion", StatGroup.CombatStats, ReadMagicEvasion));
+
+            // Group 5 - Details (indices 15-17)
+            statList.Add(new StatusStatDefinition("Commands", StatGroup.Details, ReadCommands));
+            statList.Add(new StatusStatDefinition("Magicite", StatGroup.Details, ReadMagicite));
+            statList.Add(new StatusStatDefinition("At Level Up", StatGroup.Details, ReadLevelUpBonus));
+        }
+
+        public static void NavigateNext()
+        {
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            tracker.CurrentStatIndex = (tracker.CurrentStatIndex + 1) % statList.Count;
+            ReadCurrentStat();
+        }
+
+        public static void NavigatePrevious()
+        {
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            tracker.CurrentStatIndex--;
+            if (tracker.CurrentStatIndex < 0)
             {
-                return "No character data available";
+                tracker.CurrentStatIndex = statList.Count - 1;
+            }
+            ReadCurrentStat();
+        }
+
+        public static void JumpToNextGroup()
+        {
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            int currentIndex = tracker.CurrentStatIndex;
+            int nextGroupIndex = -1;
+            int nextGroupNum = -1;
+
+            for (int i = 0; i < GroupStartIndices.Length; i++)
+            {
+                if (GroupStartIndices[i] > currentIndex)
+                {
+                    nextGroupIndex = GroupStartIndices[i];
+                    nextGroupNum = i;
+                    break;
+                }
+            }
+
+            // Wrap to first group if at end
+            if (nextGroupIndex == -1)
+            {
+                nextGroupIndex = GroupStartIndices[0];
+                nextGroupNum = 0;
+            }
+
+            tracker.CurrentStatIndex = nextGroupIndex;
+            AnnounceGroupAndStat(nextGroupNum);
+        }
+
+        public static void JumpToPreviousGroup()
+        {
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            int currentIndex = tracker.CurrentStatIndex;
+            int prevGroupIndex = -1;
+            int prevGroupNum = -1;
+
+            for (int i = GroupStartIndices.Length - 1; i >= 0; i--)
+            {
+                if (GroupStartIndices[i] < currentIndex)
+                {
+                    prevGroupIndex = GroupStartIndices[i];
+                    prevGroupNum = i;
+                    break;
+                }
+            }
+
+            // Wrap to last group if at beginning
+            if (prevGroupIndex == -1)
+            {
+                prevGroupIndex = GroupStartIndices[GroupStartIndices.Length - 1];
+                prevGroupNum = GroupStartIndices.Length - 1;
+            }
+
+            tracker.CurrentStatIndex = prevGroupIndex;
+            AnnounceGroupAndStat(prevGroupNum);
+        }
+
+        public static void JumpToTop()
+        {
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            tracker.CurrentStatIndex = 0;
+            ReadCurrentStat();
+        }
+
+        public static void JumpToBottom()
+        {
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.IsNavigationActive) return;
+
+            tracker.CurrentStatIndex = statList.Count - 1;
+            ReadCurrentStat();
+        }
+
+        public static void ReadCurrentStat()
+        {
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.ValidateState())
+            {
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Navigation not available");
+                return;
+            }
+
+            ReadStatAtIndex(tracker.CurrentStatIndex);
+        }
+
+        private static void AnnounceGroupAndStat(int groupNum)
+        {
+            var tracker = StatusNavigationTracker.Instance;
+            if (!tracker.ValidateState()) return;
+
+            if (tracker.CurrentCharacterData == null)
+            {
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("No character data");
+                return;
             }
 
             try
             {
-                var param = currentCharacterData.parameter;
-                var parts = new List<string>();
-
-                // Strength (Power)
-                int strength = param.ConfirmedPower();
-                parts.Add($"Strength: {strength}");
-
-                // Stamina (Vitality)
-                int stamina = param.ConfirmedVitality();
-                parts.Add($"Stamina: {stamina}");
-
-                // Defense
-                int defense = param.ConfirmedDefense();
-                parts.Add($"Defense: {defense}");
-
-                // Evade (Defense Count)
-                int evade = param.ConfirmedDefenseCount();
-                parts.Add($"Evade: {evade}");
-
-                return string.Join(". ", parts);
+                string groupName = (groupNum >= 0 && groupNum < GroupNames.Length) ? GroupNames[groupNum] : "";
+                var stat = statList[tracker.CurrentStatIndex];
+                string value = stat.Reader(tracker.CurrentCharacterData);
+                string announcement = string.IsNullOrEmpty(groupName) ? value : $"{groupName}: {value}";
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(announcement, true);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                return $"Error reading physical stats: {ex.Message}";
+                MelonLogger.Error($"Error reading stat with group: {ex.Message}");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Error reading stat");
             }
         }
 
-        /// <summary>
-        /// Read magical combat stats (Magic, Spirit, Magic Defense, Magic Evade).
-        /// Called when user presses ] key on status screen.
-        /// </summary>
-        public static string ReadMagicalStats()
+        private static void ReadStatAtIndex(int index)
         {
-            if (currentCharacterData == null || currentCharacterData.parameter == null)
+            if (statList == null) InitializeStatList();
+
+            var tracker = StatusNavigationTracker.Instance;
+
+            if (index < 0 || index >= statList.Count)
             {
-                return "No character data available";
+                MelonLogger.Warning($"Invalid stat index: {index}");
+                return;
+            }
+
+            if (tracker.CurrentCharacterData == null)
+            {
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("No character data");
+                return;
             }
 
             try
             {
-                var param = currentCharacterData.parameter;
-                var parts = new List<string>();
-
-                // Magic Power
-                int magic = param.ConfirmedMagic();
-                parts.Add($"Magic: {magic}");
-
-                // Spirit
-                int spirit = param.ConfirmedSpirit();
-                parts.Add($"Spirit: {spirit}");
-
-                // Magic Defense
-                int magicDefense = param.ConfirmedAbilityDefense();
-                parts.Add($"Magic Defense: {magicDefense}");
-
-                // Magic Evade
-                int magicEvade = param.ConfirmedAbilityEvasionRate();
-                parts.Add($"Magic Evade: {magicEvade}");
-
-                return string.Join(". ", parts);
+                var stat = statList[index];
+                string value = stat.Reader(tracker.CurrentCharacterData);
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(value, true);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                return $"Error reading magical stats: {ex.Message}";
+                MelonLogger.Error($"Error reading stat at index {index}: {ex.Message}");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Error reading stat");
+            }
+        }
+
+        // --- Per-stat reader functions ---
+
+        private static string ReadNameAndClass(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var statusView = tracker.ActiveController?.statusController?.view as AbilityCharaStatusView;
+
+                string name = null;
+                if (statusView?.NameText != null)
+                {
+                    name = StatusDetailsReader.GetTextSafe(statusView.NameText);
+                }
+
+                // Walk hierarchy for class title (text component with "job" or "class" in name)
+                string classTitle = null;
+                if (statusView != null)
+                {
+                    classTitle = FindClassTitleInHierarchy(statusView.transform);
+                }
+
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(classTitle))
+                    return $"{name}, {classTitle}";
+                if (!string.IsNullOrEmpty(name))
+                    return name;
+                if (!string.IsNullOrEmpty(classTitle))
+                    return classTitle;
+                return "N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading name and class: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string FindClassTitleInHierarchy(UnityEngine.Transform root)
+        {
+            try
+            {
+                for (int i = 0; i < root.childCount; i++)
+                {
+                    var child = root.GetChild(i);
+                    if (child == null) continue;
+
+                    string objName = child.name?.ToLower() ?? "";
+                    if (objName.Contains("job") || objName.Contains("class"))
+                    {
+                        var textComp = child.GetComponent<Text>();
+                        if (textComp != null)
+                        {
+                            string text = StatusDetailsReader.GetTextSafe(textComp);
+                            if (!string.IsNullOrEmpty(text))
+                                return text;
+                        }
+                    }
+
+                    // Recurse into children
+                    string found = FindClassTitleInHierarchy(child);
+                    if (found != null) return found;
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error searching for class title: {ex.Message}");
+            }
+            return null;
+        }
+
+        private static string ReadLevel(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var statusView = tracker.ActiveController?.statusController?.view as AbilityCharaStatusView;
+                if (statusView?.CurrentLevelText != null)
+                {
+                    string level = StatusDetailsReader.GetTextSafe(statusView.CurrentLevelText);
+                    if (!string.IsNullOrEmpty(level))
+                        return $"Level: {level}";
+                }
+                return "N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading level: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadExperience(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var detailsView = tracker.ActiveController?.view;
+                if (detailsView?.ExpText != null)
+                {
+                    string exp = StatusDetailsReader.GetTextSafe(detailsView.ExpText);
+                    if (!string.IsNullOrEmpty(exp))
+                        return $"Experience: {exp}";
+                }
+                return "N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading experience: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadNextLevel(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var detailsView = tracker.ActiveController?.view;
+                if (detailsView?.NextExpText != null)
+                {
+                    string nextExp = StatusDetailsReader.GetTextSafe(detailsView.NextExpText);
+                    if (!string.IsNullOrEmpty(nextExp))
+                        return $"Next Level in: {nextExp}";
+                }
+                return "N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading next level: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadHP(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                int current = data.parameter.CurrentHP;
+                int max = data.parameter.ConfirmedMaxHp();
+                return $"HP: {current} / {max}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading HP: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadMP(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                int current = data.parameter.CurrentMP;
+                int max = data.parameter.ConfirmedMaxMp();
+                return $"MP: {current} / {max}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading MP: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadStrength(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Strength: {data.parameter.ConfirmedPower()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Strength: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadAgility(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Agility: {data.parameter.ConfirmedAgility()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Agility: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadStamina(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Stamina: {data.parameter.ConfirmedVitality()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Stamina: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadMagic(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Magic: {data.parameter.ConfirmedMagic()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Magic: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadAttack(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Attack: {data.parameter.ConfirmedAttack()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Attack: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadDefense(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Defense: {data.parameter.ConfirmedDefense()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Defense: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadEvasion(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Evasion: {data.parameter.ConfirmedDefenseCount()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Evasion: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadMagicDefense(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Magic Defense: {data.parameter.ConfirmedAbilityDefense()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Magic Defense: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadMagicEvasion(OwnedCharacterData data)
+        {
+            try
+            {
+                if (data?.parameter == null) return "N/A";
+                return $"Magic Evasion: {data.parameter.ConfirmedAbilityEvasionRate()}";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading Magic Evasion: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadCommands(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var detailsView = tracker.ActiveController?.view;
+                if (detailsView == null) return "N/A";
+
+                var commandList = detailsView.BattleCommandTextList;
+                if (commandList == null || commandList.Count == 0)
+                    return "Commands: none";
+
+                var commands = new List<string>();
+                for (int i = 0; i < commandList.Count; i++)
+                {
+                    var text = commandList[i];
+                    if (text != null)
+                    {
+                        string commandText = text.text;
+                        if (!string.IsNullOrWhiteSpace(commandText))
+                        {
+                            commands.Add(commandText.Trim());
+                        }
+                    }
+                }
+
+                return commands.Count > 0 ? $"Commands: {string.Join(", ", commands)}" : "Commands: none";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading commands: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadMagicite(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var detailsView = tracker.ActiveController?.view;
+                if (detailsView?.MagicalStoneText != null)
+                {
+                    string magicite = StatusDetailsReader.GetTextSafe(detailsView.MagicalStoneText);
+                    if (!string.IsNullOrEmpty(magicite) && magicite.Trim() != "---")
+                        return $"Magicite: {magicite}";
+                    return "Magicite: none";
+                }
+                return "Magicite: N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading magicite: {ex.Message}");
+                return "N/A";
+            }
+        }
+
+        private static string ReadLevelUpBonus(OwnedCharacterData data)
+        {
+            try
+            {
+                var tracker = StatusNavigationTracker.Instance;
+                var detailsView = tracker.ActiveController?.view;
+                if (detailsView?.LevelUpBonusText != null)
+                {
+                    string bonus = StatusDetailsReader.GetTextSafe(detailsView.LevelUpBonusText);
+                    if (!string.IsNullOrEmpty(bonus) && bonus.Trim() != "---")
+                        return $"At Level Up: {bonus}";
+                    return "At Level Up: none";
+                }
+                return "At Level Up: N/A";
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error reading level up bonus: {ex.Message}");
+                return "N/A";
             }
         }
     }
