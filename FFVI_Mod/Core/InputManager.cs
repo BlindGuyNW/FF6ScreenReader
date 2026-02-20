@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Il2Cpp;
+using MelonLoader;
+using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
+using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -26,6 +29,13 @@ namespace FFVI_ScreenReader.Core
             // Handle modal dialogs (consume all input when open)
             if (ConfirmationDialog.HandleInput()) return;
             if (TextInputWindow.HandleInput()) return;
+
+            // Handle item detail navigator (Up/Down navigation, auto-deactivates when screen closes)
+            if (Menus.ItemDetailNavigator.IsActive)
+            {
+                if (Input.anyKeyDown && Menus.ItemDetailNavigator.HandleInput())
+                    return; // Consumed Up/Down, let other keys pass through
+            }
 
             // Early exit if no keys pressed this frame - avoids expensive FindObjectOfType calls
             if (!Input.anyKeyDown)
@@ -315,6 +325,12 @@ namespace FFVI_ScreenReader.Core
                 mod.CyclePreviousCategory();
             }
 
+            // Hotkey: I to announce item/config details
+            if (Input.GetKeyDown(KeyCode.I))
+            {
+                HandleItemInfoKey();
+            }
+
             // Hotkey: T to announce active timers
             if (Input.GetKeyDown(KeyCode.T))
             {
@@ -329,6 +345,91 @@ namespace FFVI_ScreenReader.Core
                     Patches.TimerHelper.AnnounceActiveTimers();
                 }
             }
+        }
+
+        private void HandleItemInfoKey()
+        {
+            // Try item menu equip check first
+            if (Menus.ItemEquipAnnouncer.TryAnnounceEquipRequirements())
+                return;
+
+            // Try shop info - re-read the current description if in a shop
+            try
+            {
+                var shopInfo = UnityEngine.Object.FindObjectOfType<Il2CppLast.UI.KeyInput.ShopInfoController>();
+                if (shopInfo != null && shopInfo.gameObject != null && shopInfo.gameObject.activeInHierarchy)
+                {
+                    // Re-read description and MP cost
+                    string description = shopInfo.view?.descriptionText?.text;
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        string mpCost = shopInfo.itemInfoController?.shopItemInfoView?.mpText?.text;
+                        string announcement = string.IsNullOrEmpty(mpCost) ? description : $"{description}. {mpCost}";
+                        FFVI_ScreenReaderMod.SpeakText(announcement);
+                        return;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading shop info: {ex.Message}");
+            }
+
+            // Fall back to config tooltip
+            AnnounceConfigTooltip();
+        }
+
+        private void AnnounceConfigTooltip()
+        {
+            try
+            {
+                var keyInputController = Utils.GameObjectCache.Get<ConfigActualDetailsControllerBase_KeyInput>();
+                if (keyInputController == null)
+                    keyInputController = Utils.GameObjectCache.Refresh<ConfigActualDetailsControllerBase_KeyInput>();
+
+                if (keyInputController != null && keyInputController.gameObject.activeInHierarchy)
+                {
+                    string description = TryReadDescriptionText(() => keyInputController.descriptionText);
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        FFVI_ScreenReaderMod.SpeakText(description);
+                        return;
+                    }
+                }
+
+                var touchController = Utils.GameObjectCache.Get<ConfigActualDetailsControllerBase_Touch>();
+                if (touchController == null)
+                    touchController = Utils.GameObjectCache.Refresh<ConfigActualDetailsControllerBase_Touch>();
+
+                if (touchController != null && touchController.gameObject.activeInHierarchy)
+                {
+                    string description = TryReadDescriptionText(() => touchController.descriptionText);
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        FFVI_ScreenReaderMod.SpeakText(description);
+                        return;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Error($"Error reading config tooltip: {ex.Message}");
+            }
+        }
+
+        private string TryReadDescriptionText(System.Func<UnityEngine.UI.Text> getTextField)
+        {
+            try
+            {
+                var descText = getTextField();
+                if (descText != null && !string.IsNullOrWhiteSpace(descText.text))
+                    return descText.text.Trim();
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error accessing description text: {ex.Message}");
+            }
+            return null;
         }
 
         /// <summary>
