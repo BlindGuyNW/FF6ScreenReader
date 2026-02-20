@@ -218,6 +218,9 @@ namespace FFVI_ScreenReader.Core
                         SpeakText($"Entering {mapName}", interrupt: false);
                         lastAnnouncedMapId = currentMapId;
 
+                        // Reset vehicle landing state for the new map
+                        Patches.MapUIManager_SwitchLandable_Patch.ResetState();
+
                         // Delay entity scan to allow new map to fully initialize
                         CoroutineManager.StartManaged(DelayedMapTransitionScan());
                     }
@@ -715,23 +718,6 @@ namespace FFVI_ScreenReader.Core
                 float altitudeRatio = fieldMap.fieldController.GetFlightAltitudeFieldOfViewRatio(true);
                 string altitude = Utils.AirshipNavigationReader.GetAltitudeDescription(altitudeRatio);
                 statusParts.Add(altitude);
-
-                // Get landing zone status
-                Vector3 airshipPos = airshipController.fieldPlayer.transform.localPosition;
-                string terrainName;
-                bool canLand;
-                bool success = Utils.AirshipNavigationReader.GetTerrainAtPosition(
-                    airshipPos,
-                    fieldMap.fieldController,
-                    out terrainName,
-                    out canLand
-                );
-
-                if (success)
-                {
-                    string landingStatus = Utils.AirshipNavigationReader.BuildLandingZoneAnnouncement(terrainName, canLand);
-                    statusParts.Add(landingStatus);
-                }
 
                 string statusMessage = string.Join(". ", statusParts);
                 SpeakText(statusMessage);

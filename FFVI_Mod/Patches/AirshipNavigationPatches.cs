@@ -12,21 +12,16 @@ namespace FFVI_ScreenReader.Patches
 {
     /// <summary>
     /// Patches for airship navigation accessibility.
-    /// Announces direction changes (8-way compass), altitude changes, and landing zone status.
+    /// Announces direction changes (8-way compass) and altitude changes.
     /// </summary>
     public static class AirshipNavigationPatches
     {
         // Track last announced values to prevent duplicates
         private static string lastDirection = "";
         private static string lastAltitudeLevel = "";
-        private static string lastLandingZone = "";
-
-        // Timestamp to throttle landing zone announcements (every 2 seconds)
-        private static float lastLandingZoneCheckTime = 0f;
-        private const float LANDING_ZONE_CHECK_INTERVAL = 2.0f;
 
         /// <summary>
-        /// Patch LateUpdateObserveInput to check rotation and landing zones continuously
+        /// Patch LateUpdateObserveInput to check rotation continuously
         /// </summary>
         [HarmonyPatch(typeof(FieldPlayerKeyAirshipController), nameof(FieldPlayerKeyAirshipController.LateUpdateObserveInput))]
         public static class FieldPlayerKeyAirshipController_LateUpdateObserveInput_Patch
@@ -59,16 +54,9 @@ namespace FFVI_ScreenReader.Patches
                         {
                             lastDirection = currentDirection;
                             MelonLogger.Msg($"[Airship] Facing: {currentDirection}");
-                            FFVI_ScreenReaderMod.SpeakText($"Facing {currentDirection}");
+                            bool recentLanding = (Time.time - MapUIManager_SwitchLandable_Patch.LastAnnouncementTime) < 0.5f;
+                            FFVI_ScreenReaderMod.SpeakText($"Facing {currentDirection}", interrupt: !recentLanding);
                         }
-                    }
-
-                    // Check landing zone status (throttled to avoid spam)
-                    float currentTime = Time.time;
-                    if (currentTime - lastLandingZoneCheckTime >= LANDING_ZONE_CHECK_INTERVAL)
-                    {
-                        lastLandingZoneCheckTime = currentTime;
-                        CheckAndAnnounceLandingZone(fieldPlayer);
                     }
                 }
                 catch (Exception ex)
@@ -129,7 +117,8 @@ namespace FFVI_ScreenReader.Patches
 
                         string announcement = $"{changeDirection}{currentAltitudeLevel}";
                         MelonLogger.Msg($"[Airship] Altitude: {announcement}");
-                        FFVI_ScreenReaderMod.SpeakText(announcement);
+                        bool recentLanding = (Time.time - MapUIManager_SwitchLandable_Patch.LastAnnouncementTime) < 0.5f;
+                        FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: !recentLanding);
                     }
                 }
                 catch (Exception ex)
@@ -153,55 +142,12 @@ namespace FFVI_ScreenReader.Patches
         }
 
         /// <summary>
-        /// Check landing zone status and announce if changed
-        /// </summary>
-        private static void CheckAndAnnounceLandingZone(FieldPlayer fieldPlayer)
-        {
-            try
-            {
-                // Get field map and controller
-                var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
-                if (fieldMap == null || fieldMap.fieldController == null)
-                {
-                    return;
-                }
-
-                Vector3 airshipPos = fieldPlayer.transform.localPosition;
-                FieldController fieldController = fieldMap.fieldController;
-
-                // Get terrain info at current position
-                string terrainName;
-                bool canLand;
-                bool success = AirshipNavigationReader.GetTerrainAtPosition(airshipPos, fieldController, out terrainName, out canLand);
-
-                if (success)
-                {
-                    string landingZoneStatus = AirshipNavigationReader.BuildLandingZoneAnnouncement(terrainName, canLand);
-
-                    // Only announce if changed
-                    if (landingZoneStatus != lastLandingZone && !string.IsNullOrEmpty(landingZoneStatus))
-                    {
-                        lastLandingZone = landingZoneStatus;
-                        MelonLogger.Msg($"[Airship] Landing Zone: {landingZoneStatus}");
-                        FFVI_ScreenReaderMod.SpeakText(landingZoneStatus);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"Error checking landing zone: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Reset state when leaving airship mode
         /// </summary>
         public static void ResetState()
         {
             lastDirection = "";
             lastAltitudeLevel = "";
-            lastLandingZone = "";
-            lastLandingZoneCheckTime = 0f;
         }
     }
 }
