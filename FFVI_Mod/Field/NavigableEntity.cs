@@ -26,7 +26,14 @@ namespace FFVI_ScreenReader.Field
         /// <summary>
         /// Entity name (localized if available)
         /// </summary>
-        public virtual string Name => GameEntity?.Property?.Name ?? "Unknown";
+        public virtual string Name
+        {
+            get
+            {
+                string rawName = GameEntity?.Property?.Name ?? "Unknown";
+                return Utils.EntityTranslator.Translate(rawName);
+            }
+        }
 
         /// <summary>
         /// Category for filtering purposes

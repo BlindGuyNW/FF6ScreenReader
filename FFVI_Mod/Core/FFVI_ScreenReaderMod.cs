@@ -70,6 +70,7 @@ namespace FFVI_ScreenReader.Core
             // Initialize centralized preferences and mod menu
             PreferencesManager.Initialize();
             ModMenu.Initialize();
+            Utils.EntityTranslator.Initialize();
 
             // Load saved preferences
             filterByPathfinding = PreferencesManager.PathfindingFilterDefault;

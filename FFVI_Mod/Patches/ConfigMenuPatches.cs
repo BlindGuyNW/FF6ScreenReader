@@ -37,6 +37,12 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Don't announce if controller is not active (prevents announcements during scene loading)
+                if (__instance.gameObject == null || !__instance.gameObject.activeInHierarchy)
+                {
+                    return;
+                }
+
                 // Get the view which contains the localized text
                 var view = __instance.view;
                 if (view == null)

@@ -263,6 +263,15 @@ namespace FFVI_ScreenReader.Core
                 else
                     mod.ToggleAudioBeacons();
             }
+
+            // BackQuote (`): Dump Japanese entity names for current map
+            if (Input.GetKeyDown(KeyCode.BackQuote))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                else
+                    Utils.EntityTranslator.EntityDump.DumpCurrentMap();
+            }
         }
 
         /// <summary>
