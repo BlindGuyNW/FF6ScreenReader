@@ -457,6 +457,11 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public int TransportationId { get; set; }
 
+        /// <summary>
+        /// Message ID for localized vehicle name lookup
+        /// </summary>
+        public string MessageId { get; set; }
+
         public override EntityCategory Category => EntityCategory.Vehicles;
 
         public override int Priority => 10;
@@ -465,7 +470,7 @@ namespace FFVI_ScreenReader.Field
 
         protected override string GetDisplayName()
         {
-            return GetVehicleName(TransportationId);
+            return GetVehicleName(TransportationId, MessageId);
         }
 
         protected override string GetEntityTypeName()
@@ -473,16 +478,25 @@ namespace FFVI_ScreenReader.Field
             return "Vehicle";
         }
 
-        public static string GetVehicleName(int id)
+        public static string GetVehicleName(int id, string messageId = null)
         {
-            // Based on MapConstants.TransportationType enum
+            // Try MessageId first for localized name
+            if (!string.IsNullOrEmpty(messageId))
+            {
+                try
+                {
+                    var msg = Il2CppLast.Management.MessageManager.Instance?.GetMessage(messageId);
+                    if (!string.IsNullOrEmpty(msg))
+                        return msg;
+                }
+                catch { }
+            }
+
+            // Fallback to hardcoded names based on MapConstants.TransportationType enum
             switch (id)
             {
-                case 1: return "Player";
                 case 2: return "Ship";
                 case 3: return "Airship";
-                case 4: return "Symbol";
-                case 5: return "Content";
                 case 6: return "Submarine";
                 case 7: return "Low Flying Airship";
                 case 8: return "Special Airship";

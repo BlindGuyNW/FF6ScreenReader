@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Il2Cpp;
 using Il2CppLast.Entity.Field;
@@ -12,6 +13,21 @@ namespace FFVI_ScreenReader.Field
 {
     public static class FieldNavigationHelper
     {
+        /// <summary>
+        /// Maps FieldEntity → (TransportationType, MessageId) for vehicles detected via
+        /// TransportationController.ModelList. Populated each scan, cleared on map transition.
+        /// </summary>
+        public static Dictionary<FieldEntity, (int Type, string MessageId)> VehicleTypeMap { get; }
+            = new Dictionary<FieldEntity, (int, string)>();
+
+        /// <summary>
+        /// Clears the VehicleTypeMap. Call on every map transition.
+        /// </summary>
+        public static void ResetVehicleTypeMap()
+        {
+            VehicleTypeMap.Clear();
+        }
+
         /// <summary>
         /// Gets all FieldEntity objects currently in the world (no filtering or wrapping).
         /// Returns raw game entities from both the main entity list and transportation system.
@@ -56,9 +72,83 @@ namespace FFVI_ScreenReader.Field
                         }
                     }
                 }
+
+                // Populate VehicleTypeMap from TransportationController.ModelList
+                PopulateVehicleTypeMap(fieldMap.fieldController.transportation, results);
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Reads TransportationController → Transportation.ModelList via unsafe pointer access
+        /// to identify vehicle entities by their TransportationType and MessageId.
+        /// Ported from FF5 screen reader – pointer offsets (0x18) are identical between FF5 and FF6.
+        /// </summary>
+        private static unsafe void PopulateVehicleTypeMap(
+            TransportationController transportController, List<FieldEntity> results)
+        {
+            if (transportController == null) return;
+
+            try
+            {
+                IntPtr transportControllerPtr = transportController.Pointer;
+                if (transportControllerPtr == IntPtr.Zero)
+                    return;
+
+                // TransportationController.infoData (Transportation) at offset 0x18
+                IntPtr infoDataPtr = *(IntPtr*)((byte*)transportControllerPtr + 0x18);
+                if (infoDataPtr == IntPtr.Zero)
+                    return;
+
+                // Transportation.modelList (Dictionary<int, TransportationInfo>) at offset 0x18
+                IntPtr modelListPtr = *(IntPtr*)((byte*)infoDataPtr + 0x18);
+                if (modelListPtr == IntPtr.Zero)
+                    return;
+
+                var modelListObj = new Il2CppSystem.Object(modelListPtr);
+                var modelDict = modelListObj.TryCast<Il2CppSystem.Collections.Generic.Dictionary<int, TransportationInfo>>();
+                if (modelDict == null)
+                    return;
+
+                foreach (var kvp in modelDict)
+                {
+                    try
+                    {
+                        var transportInfo = kvp.Value;
+                        if (transportInfo == null) continue;
+
+                        bool enabled = transportInfo.Enable;
+                        int vehicleType = transportInfo.Type;
+                        string messageId = transportInfo.MessageId ?? "";
+
+                        var mapObject = transportInfo.MapObject;
+                        if (mapObject == null) continue;
+
+                        // Filter out NONE(0), PLAYER(1), SYMBOL(4), CONTENT(5); only enabled vehicles
+                        if (vehicleType > 1 && vehicleType != 4 && vehicleType != 5 && enabled)
+                        {
+                            if (!VehicleTypeMap.ContainsKey(mapObject))
+                            {
+                                VehicleTypeMap[mapObject] = (vehicleType, messageId);
+                            }
+
+                            if (!results.Contains(mapObject))
+                            {
+                                results.Add(mapObject);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning($"[Vehicle] Error processing vehicle: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[Vehicle] Error in PopulateVehicleTypeMap: {ex.Message}");
+            }
         }
 
         /// <summary>

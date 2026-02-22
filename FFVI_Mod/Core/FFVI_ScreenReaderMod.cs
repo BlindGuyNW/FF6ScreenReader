@@ -219,8 +219,9 @@ namespace FFVI_ScreenReader.Core
                         SpeakText($"Entering {mapName}", interrupt: false);
                         lastAnnouncedMapId = currentMapId;
 
-                        // Reset vehicle landing state for the new map
+                        // Reset vehicle landing state and vehicle type map for the new map
                         Patches.MapUIManager_SwitchLandable_Patch.ResetState();
+                        Field.FieldNavigationHelper.ResetVehicleTypeMap();
 
                         // Delay entity scan to allow new map to fully initialize
                         CoroutineManager.StartManaged(DelayedMapTransitionScan());
@@ -357,8 +358,11 @@ namespace FFVI_ScreenReader.Core
 
         internal void CycleNextCategory()
         {
-            // Cycle to next category
+            // Cycle to next category, skipping Waypoints (they have their own navigation system)
             int nextCategory = ((int)entityNavigator.CurrentCategory + 1) % CategoryCount;
+            if ((EntityCategory)nextCategory == EntityCategory.Waypoints)
+                nextCategory = (nextCategory + 1) % CategoryCount;
+
             EntityCategory newCategory = (EntityCategory)nextCategory;
 
             // Update navigator category (automatically rebuilds list)
@@ -370,10 +374,16 @@ namespace FFVI_ScreenReader.Core
 
         internal void CyclePreviousCategory()
         {
-            // Cycle to previous category
+            // Cycle to previous category, skipping Waypoints (they have their own navigation system)
             int prevCategory = (int)entityNavigator.CurrentCategory - 1;
             if (prevCategory < 0)
                 prevCategory = CategoryCount - 1;
+            if ((EntityCategory)prevCategory == EntityCategory.Waypoints)
+            {
+                prevCategory--;
+                if (prevCategory < 0)
+                    prevCategory = CategoryCount - 1;
+            }
 
             EntityCategory newCategory = (EntityCategory)prevCategory;
 

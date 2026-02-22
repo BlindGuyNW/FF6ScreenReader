@@ -458,8 +458,10 @@ namespace FFVI_ScreenReader.Core
                     return "Events";
                 case EntityCategory.Vehicles:
                     return "Vehicles";
+                case EntityCategory.Waypoints:
+                    return "Waypoints";
                 default:
-                    return "Unknown";
+                    return category.ToString();
             }
         }
     }
