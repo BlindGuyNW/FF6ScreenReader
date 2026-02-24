@@ -264,6 +264,21 @@ namespace FFVI_ScreenReader.Core
                     mod.ToggleAudioBeacons();
             }
 
+            // F5: Cycle Enemy HP Display mode
+            if (Input.GetKeyDown(KeyCode.F5))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                else
+                {
+                    int current = PreferencesManager.EnemyHPDisplay;
+                    int next = (current + 1) % 3;
+                    PreferencesManager.SetEnemyHPDisplay(next);
+                    string[] labels = { "Numbers", "Percentage", "Hidden" };
+                    FFVI_ScreenReaderMod.SpeakText($"Enemy HP: {labels[next]}");
+                }
+            }
+
             // BackQuote (`): Dump Japanese entity names for current map
             if (Input.GetKeyDown(KeyCode.BackQuote))
             {

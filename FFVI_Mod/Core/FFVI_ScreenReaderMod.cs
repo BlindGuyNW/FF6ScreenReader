@@ -124,6 +124,7 @@ namespace FFVI_ScreenReader.Core
         {
             try
             {
+                Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter = null;
                 LoggerInstance.Msg($"[ComponentCache] Scene loaded: {scene.name}");
 
                 // Try to find and cache FieldPlayerController

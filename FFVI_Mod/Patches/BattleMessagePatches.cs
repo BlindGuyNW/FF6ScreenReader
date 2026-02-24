@@ -700,6 +700,18 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
+    // Clear CurrentActiveCharacter when battle ends so IsInBattle() doesn't stay stuck
+    [HarmonyPatch(typeof(Il2CppLast.Battle.BattleController),
+                  nameof(Il2CppLast.Battle.BattleController.Exit))]
+    public static class BattleController_Exit_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix()
+        {
+            BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter = null;
+        }
+    }
+
 
     // DISABLED - Touch controls not needed for keyboard/controller
     /*
