@@ -221,8 +221,8 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // Hotkey: P or \ to pathfind to current entity
-            if (Input.GetKeyDown(KeyCode.P) || Input.GetKeyDown(KeyCode.Backslash))
+            // Hotkey: P or \ to pathfind to current entity (skip \ when Ctrl held — handled in HandleGlobalInput)
+            if (Input.GetKeyDown(KeyCode.P) || (Input.GetKeyDown(KeyCode.Backslash) && !IsCtrlHeld()))
             {
                 // Check for Shift+P/\ (toggle pathfinding filter)
                 if (IsShiftHeld())
@@ -351,10 +351,14 @@ namespace FFVI_ScreenReader.Core
             // Handle waypoint hotkeys (works anywhere on field)
             HandleWaypointInput();
 
-            // Hotkey: Ctrl+Arrow to teleport in the direction of the arrow
+            // Hotkey: Ctrl+Arrow to teleport, Ctrl+\ to toggle layer filter
             if (IsCtrlHeld())
             {
-                if (Input.GetKeyDown(KeyCode.UpArrow))
+                if (Input.GetKeyDown(KeyCode.Backslash))
+                {
+                    mod.ToggleToLayerFilter();
+                }
+                else if (Input.GetKeyDown(KeyCode.UpArrow))
                 {
                     mod.TeleportInDirection(new Vector2(0, 16)); // North
                 }
