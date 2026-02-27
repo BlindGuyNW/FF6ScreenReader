@@ -133,7 +133,18 @@ namespace FFVI_ScreenReader.Field
         protected override string GetDisplayName()
         {
             string status = IsOpened ? "Opened" : "Unopened";
-            return $"{status} {Name}";
+            return $"{status} Treasure Chest";
+        }
+
+        /// <summary>
+        /// Suppress the trailing "- Treasure Chest" type suffix since
+        /// "Treasure Chest" is already in the display name.
+        /// </summary>
+        public override string FormatDescription(Vector3 playerPos)
+        {
+            float distance = Vector3.Distance(playerPos, Position);
+            string direction = GetDirection(playerPos, Position);
+            return $"{GetDisplayName()} ({FormatSteps(distance)} {direction})";
         }
 
         protected override string GetEntityTypeName()
@@ -253,14 +264,8 @@ namespace FFVI_ScreenReader.Field
                 characterName = GetCharacterName(AssetName);
             }
 
-            if (!string.IsNullOrEmpty(characterName))
-            {
-                details.Add(characterName);
-            }
-            else if (!string.IsNullOrEmpty(AssetName) && AssetName != Name)
-            {
-                details.Add(AssetName);
-            }
+            // Use characterName as display name when available, fall back to Name
+            string displayName = !string.IsNullOrEmpty(characterName) ? characterName : Name;
 
             // Add shop indicator
             if (IsShop)
@@ -284,7 +289,7 @@ namespace FFVI_ScreenReader.Field
             }
 
             string detailStr = details.Count > 0 ? $" ({string.Join(", ", details)})" : "";
-            return $"{Name}{detailStr}";
+            return $"{displayName}{detailStr}";
         }
 
         protected override string GetEntityTypeName()
@@ -316,10 +321,15 @@ namespace FFVI_ScreenReader.Field
 
         protected override string GetDisplayName()
         {
-            // Build enhanced name with destination
-            return !string.IsNullOrEmpty(DestinationName)
-                ? $"{Name} → {DestinationName}"
-                : Name;
+            if (!string.IsNullOrEmpty(DestinationName))
+            {
+                // If Name contains Japanese characters, it's untranslated and redundant
+                // when we already have a localized destination name
+                if (Utils.EntityTranslator.ContainsJapaneseCharacters(Name))
+                    return DestinationName;
+                return $"{Name} → {DestinationName}";
+            }
+            return Name;
         }
 
         protected override string GetEntityTypeName()

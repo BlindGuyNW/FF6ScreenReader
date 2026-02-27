@@ -279,11 +279,6 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // BackQuote (`): Dump Japanese entity names for current map
-            if (Input.GetKeyDown(KeyCode.BackQuote))
-            {
-                Utils.EntityTranslator.EntityDump.DumpCurrentMap();
-            }
         }
 
         /// <summary>

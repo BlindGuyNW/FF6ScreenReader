@@ -146,12 +146,19 @@ namespace FFVI_ScreenReader.Field
                 return baseName;
             }
 
-            // For map exits, use the formatted name
+            // For map exits, use the formatted name with Japanese stripping
             if (rep is MapExitEntity exit)
             {
-                baseName = !string.IsNullOrEmpty(exit.DestinationName)
-                    ? $"{exit.Name} → {exit.DestinationName}"
-                    : exit.Name;
+                if (!string.IsNullOrEmpty(exit.DestinationName))
+                {
+                    baseName = Utils.EntityTranslator.ContainsJapaneseCharacters(exit.Name)
+                        ? exit.DestinationName
+                        : $"{exit.Name} → {exit.DestinationName}";
+                }
+                else
+                {
+                    baseName = exit.Name;
+                }
             }
 
             // Show count if multiple members

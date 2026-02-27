@@ -65,4 +65,8 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\FF6UserData\translation.json" LogicalName="translation.json" />
+  </ItemGroup>
+
 </Project>

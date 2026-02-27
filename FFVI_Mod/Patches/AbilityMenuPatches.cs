@@ -8,6 +8,7 @@ using Il2CppLast.Data.User;
 using Il2CppLast.Management;
 using Il2CppSerial.FF6.UI.KeyInput;
 using Il2CppSerial.FF6.Management;
+using Il2CppSerial.Template.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
@@ -358,8 +359,9 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch for ability equipping/changing content selection.
-    /// Announces ability slots and currently equipped abilities.
+    /// Patch for ability equipping/changing content selection (Gogo's ability scroll list).
+    /// Reads from allEquips[] (all available commands) which backs the scroll view,
+    /// NOT from view.CurrentList (which only has the 4 command slots).
     /// </summary>
     [HarmonyPatch(typeof(AbilityChangeController), nameof(AbilityChangeController.SelectContent))]
     public static class AbilityChangeController_SelectContent_Patch
@@ -376,95 +378,55 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // Get the view
-                var view = __instance.view;
-                if (view == null)
+                // Access allEquips from the base class (StatusDetailsCommandChangeBaseController)
+                // This is the full list of available commands for the scroll view.
+                // In Il2Cpp, protected fields are exposed on the generated wrapper.
+                var allEquips = __instance.allEquips;
+                if (allEquips == null || index < 0 || index >= allEquips.Length)
                 {
                     return;
                 }
 
-                // Get the current list (the content list)
-                var contentList = view.CurrentList;
-                if (contentList == null || contentList.Count == 0)
+                var equipData = allEquips[index];
+                if (equipData == null)
                 {
                     return;
                 }
 
-                // Validate index
-                if (index < 0 || index >= contentList.Count)
+                // Get command name from the data model via MessageManager
+                if (string.IsNullOrWhiteSpace(equipData.NameMessageId))
                 {
                     return;
                 }
 
-                // Get the content controller at the index
-                var content = contentList[index];
-                if (content == null)
+                var messageManager = MessageManager.Instance;
+                if (messageManager == null)
                 {
                     return;
                 }
 
-                // Get the content view
-                var contentView = content.view;
-                if (contentView == null)
+                string commandName = StripIconMarkup(messageManager.GetMessage(equipData.NameMessageId));
+                if (string.IsNullOrWhiteSpace(commandName))
                 {
                     return;
                 }
 
-                // Build announcement from available text components
-                string announcement = "";
+                string announcement = commandName;
 
-                // Try to get the ability name from the IconText view
-                try
+                // Indicate if this command is already equipped in one of the 4 slots
+                if (equipData.IsEquiped)
                 {
-                    var iconText = contentView.IconText;
-                    if (iconText != null && iconText.nameText != null && !string.IsNullOrWhiteSpace(iconText.nameText.text))
+                    announcement += ", equipped";
+                }
+
+                // Add description if available
+                if (!string.IsNullOrWhiteSpace(equipData.DescriptionMessageId))
+                {
+                    string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
+                    if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement = iconText.nameText.text.Trim();
+                        announcement += $". {description}";
                     }
-                }
-                catch
-                {
-                    // Name text not available
-                }
-
-                // If we still don't have text, try to search the hierarchy
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    try
-                    {
-                        if (contentView.transform != null)
-                        {
-                            // Use non-allocating search for first valid text
-                            var foundText = FindFirstText(contentView.transform, t =>
-                                t.gameObject.activeInHierarchy &&
-                                !string.IsNullOrWhiteSpace(t.text) &&
-                                t.text.Trim().ToLower() != "new text" &&
-                                !t.text.Trim().StartsWith("menu_"),
-                                includeInactive: false);
-
-                            if (foundText != null)
-                            {
-                                announcement = foundText.text.Trim();
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Could not get text
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    return;
-                }
-
-                // Remove icon markup
-                announcement = StripIconMarkup(announcement);
-
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    return;
                 }
 
                 // Skip duplicate announcements
@@ -485,8 +447,9 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch for command selection in the ability change menu.
-    /// Announces which command is being modified.
+    /// Patch for command slot selection in Gogo's ability change menu.
+    /// Reads from view.CurrentList[index].TargetData (AbilityEquipData) to get
+    /// the command name, fixed status, and description for each of the 4 slots.
     /// </summary>
     [HarmonyPatch(typeof(AbilityChangeController), nameof(AbilityChangeController.SelectCommand))]
     public static class AbilityChangeController_SelectCommand_Patch
@@ -503,48 +466,80 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // Access command names through the state machine base controller's data
-                // The AbilityChangeController has access to character and command data
-                // For now, we'll use a simpler approach - just read from the view hierarchy
+                var view = __instance.view;
+                if (view == null)
+                {
+                    return;
+                }
 
-                string announcement = "";
+                // CurrentList contains the 4 command slot controllers (AbilityChangeContentController)
+                // each with a TargetData property holding AbilityEquipData
+                var currentList = view.CurrentList;
+                if (currentList == null || currentList.Count == 0)
+                {
+                    return;
+                }
 
-                // Try to read directly from the view's transform hierarchy
+                if (index < 0 || index >= currentList.Count)
+                {
+                    return;
+                }
+
+                int slotNumber = index + 1;
+                var content = currentList[index];
+
+                // Check if the slot has data
+                AbilityEquipData equipData = null;
                 try
                 {
-                    var view = __instance.view;
-                    if (view != null && view.transform != null)
+                    if (content != null)
                     {
-                        // Use non-allocating search for first valid text
-                        var foundText = FindFirstText(view.transform, t =>
-                            t.gameObject.activeInHierarchy &&
-                            !string.IsNullOrWhiteSpace(t.text) &&
-                            t.text.Trim().ToLower() != "new text" &&
-                            !t.text.Trim().StartsWith("menu_"),
-                            includeInactive: false);
-
-                        if (foundText != null)
-                        {
-                            announcement = foundText.text.Trim();
-                        }
+                        equipData = content.TargetData;
                     }
                 }
                 catch
                 {
-                    // Could not get text
+                    // TargetData access failed
                 }
 
-                if (string.IsNullOrWhiteSpace(announcement))
+                string announcement;
+
+                if (equipData == null || string.IsNullOrWhiteSpace(equipData.NameMessageId))
                 {
-                    return;
+                    announcement = $"Slot {slotNumber}: Empty";
                 }
-
-                // Remove icon markup
-                announcement = StripIconMarkup(announcement);
-
-                if (string.IsNullOrWhiteSpace(announcement))
+                else
                 {
-                    return;
+                    var messageManager = MessageManager.Instance;
+                    if (messageManager == null)
+                    {
+                        return;
+                    }
+
+                    string commandName = StripIconMarkup(messageManager.GetMessage(equipData.NameMessageId));
+                    if (string.IsNullOrWhiteSpace(commandName))
+                    {
+                        announcement = $"Slot {slotNumber}: Empty";
+                    }
+                    else
+                    {
+                        announcement = $"Slot {slotNumber}: {commandName}";
+
+                        if (equipData.IsFixed)
+                        {
+                            announcement += ", fixed";
+                        }
+
+                        // Add description if available
+                        if (!string.IsNullOrWhiteSpace(equipData.DescriptionMessageId))
+                        {
+                            string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
+                            if (!string.IsNullOrWhiteSpace(description))
+                            {
+                                announcement += $". {description}";
+                            }
+                        }
+                    }
                 }
 
                 // Skip duplicate announcements
