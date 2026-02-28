@@ -25,5 +25,15 @@ namespace FFVI_ScreenReader.Utils
 
         // Gallery
         public const string GALLERY_LIST_ENTRY = "Gallery.ListEntry";
+
+        // Config menu
+        public const string CONFIG_COMMAND = "ConfigMenu.Command";
+        public const string CONFIG_ARROW_VALUE = "ConfigMenu.ArrowValue";
+        public const string CONFIG_SLIDER_CONTROLLER = "ConfigMenu.SliderController";
+        public const string CONFIG_SLIDER_PERCENTAGE = "ConfigMenu.SliderPercentage";
+        public const string CONFIG_TOUCH_ARROW_VALUE = "ConfigMenu.TouchArrowValue";
+        public const string CONFIG_TOUCH_SLIDER_CONTROLLER = "ConfigMenu.TouchSliderController";
+        public const string CONFIG_TOUCH_SLIDER_PERCENTAGE = "ConfigMenu.TouchSliderPercentage";
+        public const string CONFIG_KEYS_SETTING = "ConfigMenu.KeysSetting";
     }
 }

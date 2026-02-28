@@ -1,6 +1,7 @@
 using System;
 using MelonLoader;
 using UnityEngine;
+using FFVI_ScreenReader.Utils;
 using ConfigCommandView_Touch = Il2CppLast.UI.Touch.ConfigCommandView;
 using ConfigCommandView_KeyInput = Il2CppLast.UI.KeyInput.ConfigCommandView;
 using ConfigCommandController_Touch = Il2CppLast.UI.Touch.ConfigCommandController;
@@ -503,6 +504,25 @@ namespace FFVI_ScreenReader.Menus
                 }
             }
 
+            return null;
+        }
+
+        /// <summary>
+        /// Read display value from a slider, preferring the game's sliderValueText.
+        /// Falls back to calculating percentage from slider range.
+        /// </summary>
+        public static string GetSliderDisplayValue(UnityEngine.UI.Slider slider, UnityEngine.UI.Text sliderValueText)
+        {
+            // Prefer game's sliderValueText - it shows raw values like "5" for BGM/SFX (1-10 range),
+            // or "50%" for Master Volume/Brightness. Read as-is without recalculating.
+            if (sliderValueText != null && !string.IsNullOrWhiteSpace(sliderValueText.text))
+                return sliderValueText.text.Trim();
+            // Fallback: calculate percentage from slider range (only if game doesn't provide text)
+            if (slider != null)
+            {
+                float percentage = (slider.value - slider.minValue) / (slider.maxValue - slider.minValue) * 100f;
+                return $"{Mathf.RoundToInt(percentage)}%";
+            }
             return null;
         }
 

@@ -39,6 +39,13 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
                 // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
                 if (BestiaryStateTracker.IsInBestiary) return;
                 if (MusicPlayerStateTracker.IsInMusicPlayer) return;
@@ -265,6 +272,13 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
                 // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
                 if (BestiaryStateTracker.IsInBestiary) return;
                 if (MusicPlayerStateTracker.IsInMusicPlayer) return;
@@ -293,7 +307,7 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     string parentName = parent.name.ToLower();
-                    if (parentName.Contains("battle_target") || 
+                    if (parentName.Contains("battle_target") ||
                         parentName.Contains("battletarget") ||
                         parentName.Contains("battle_command") ||
                         parentName.Contains("battlecommand") ||
@@ -488,6 +502,13 @@ namespace FFVI_ScreenReader.Patches
                 if (__instance.transform == null)
                 {
                     MelonLogger.Msg("GameCursor transform is null in SkipNextIndex patch");
+                    return;
+                }
+
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
                     return;
                 }
 
@@ -714,6 +735,13 @@ namespace FFVI_ScreenReader.Patches
                 if (__instance.transform == null)
                 {
                     MelonLogger.Msg("GameCursor transform is null in SkipPrevIndex patch");
+                    return;
+                }
+
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
                     return;
                 }
 

@@ -96,6 +96,10 @@ namespace FFVI_ScreenReader.Core
             waypointNavigator = new WaypointNavigator(waypointManager);
             waypointController = new WaypointController(waypointManager, waypointNavigator);
 
+            // Apply manual Harmony patches (for types that need runtime patching)
+            var harmony = new HarmonyLib.Harmony("FFVI_ScreenReader.ManualPatches");
+            Patches.PopupPatches.ApplyPatches(harmony);
+
             // Initialize external sound system
             Utils.SoundPlayer.Initialize();
 

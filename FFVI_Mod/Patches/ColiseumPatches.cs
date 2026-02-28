@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Runtime.InteropServices;
 using HarmonyLib;
 using MelonLoader;
+using UnityEngine.UI;
 using Il2CppLast.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
@@ -19,6 +21,12 @@ namespace FFVI_ScreenReader.Patches
     public static class ColiseumPatches
     {
         private static string lastItemAnnouncement = "";
+        private static int lastChallengerIndex = -1;
+
+        // ColosseumController offsets for challenger selection
+        private const int CONTROLLER_VIEW_OFFSET = 0x70;
+        private const int VIEW_CHARACTER_NAME_TEXT_OFFSET = 0xB8;
+        private const int VIEW_CHALLENGER_SELECT_TEXT_OFFSET = 0xD8;
 
         /// <summary>
         /// Announces item names when scrolling the Coliseum item selection list.
@@ -154,9 +162,6 @@ namespace FFVI_ScreenReader.Patches
                 if (!string.IsNullOrEmpty(monsterName))
                     announcement += string.Format(T(", Fight {0}"), monsterName);
 
-                if (!string.IsNullOrEmpty(announcement))
-                    announcement += T(". Yes or No");
-
                 if (string.IsNullOrEmpty(announcement))
                     yield break;
 
@@ -166,6 +171,132 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in delayed Coliseum confirmation: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Announces the "Choose a combatant" prompt and first character name
+        /// when the challenger selection screen initializes.
+        /// </summary>
+        [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.ColosseumController), "SelectChallengerInit")]
+        public static class ColosseumController_SelectChallengerInit_Patch
+        {
+            [HarmonyPostfix]
+            public static void Postfix(Il2CppLast.UI.KeyInput.ColosseumController __instance)
+            {
+                try
+                {
+                    lastChallengerIndex = -1;
+
+                    IntPtr controllerPtr = __instance.Pointer;
+                    if (controllerPtr == IntPtr.Zero) return;
+
+                    CoroutineManager.StartManaged(DelayedAnnounceChallengerInit(controllerPtr));
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Error in ColosseumController.SelectChallengerInit patch: {ex.Message}");
+                }
+            }
+        }
+
+        private static IEnumerator DelayedAnnounceChallengerInit(IntPtr controllerPtr)
+        {
+            yield return null;
+
+            try
+            {
+                if (controllerPtr == IntPtr.Zero) yield break;
+
+                IntPtr viewPtr = Marshal.ReadIntPtr(controllerPtr + CONTROLLER_VIEW_OFFSET);
+                if (viewPtr == IntPtr.Zero) yield break;
+
+                // Read "Choose a combatant" prompt text
+                string prompt = null;
+                try
+                {
+                    IntPtr promptTextPtr = Marshal.ReadIntPtr(viewPtr + VIEW_CHALLENGER_SELECT_TEXT_OFFSET);
+                    if (promptTextPtr != IntPtr.Zero)
+                    {
+                        var promptText = new Text(promptTextPtr);
+                        prompt = promptText?.text;
+                    }
+                }
+                catch { }
+
+                // Read first character name
+                string characterName = null;
+                try
+                {
+                    IntPtr nameTextPtr = Marshal.ReadIntPtr(viewPtr + VIEW_CHARACTER_NAME_TEXT_OFFSET);
+                    if (nameTextPtr != IntPtr.Zero)
+                    {
+                        var nameText = new Text(nameTextPtr);
+                        characterName = nameText?.text;
+                    }
+                }
+                catch { }
+
+                string announcement = null;
+                if (!string.IsNullOrWhiteSpace(prompt))
+                    announcement = StripIconMarkup(prompt.Trim());
+                if (!string.IsNullOrWhiteSpace(characterName))
+                {
+                    string name = StripIconMarkup(characterName.Trim());
+                    announcement = string.IsNullOrEmpty(announcement)
+                        ? name : $"{announcement} {name}";
+                    lastChallengerIndex = 0;
+                }
+
+                if (!string.IsNullOrEmpty(announcement))
+                {
+                    MelonLogger.Msg($"[Coliseum Challenger] {announcement}");
+                    FFVI_ScreenReaderMod.SpeakText(announcement, interrupt: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in delayed Coliseum challenger init: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Announces the character name when navigating the challenger selection list.
+        /// </summary>
+        [HarmonyPatch(typeof(Il2CppLast.UI.KeyInput.ColosseumController), "SelectChallenger", new Type[] { typeof(int) })]
+        public static class ColosseumController_SelectChallenger_Patch
+        {
+            [HarmonyPostfix]
+            public static void Postfix(Il2CppLast.UI.KeyInput.ColosseumController __instance, int index)
+            {
+                try
+                {
+                    if (index == lastChallengerIndex) return;
+                    lastChallengerIndex = index;
+
+                    IntPtr controllerPtr = __instance.Pointer;
+                    if (controllerPtr == IntPtr.Zero) return;
+
+                    IntPtr viewPtr = Marshal.ReadIntPtr(controllerPtr + CONTROLLER_VIEW_OFFSET);
+                    if (viewPtr == IntPtr.Zero) return;
+
+                    IntPtr nameTextPtr = Marshal.ReadIntPtr(viewPtr + VIEW_CHARACTER_NAME_TEXT_OFFSET);
+                    if (nameTextPtr == IntPtr.Zero) return;
+
+                    var nameText = new Text(nameTextPtr);
+                    string characterName = nameText?.text;
+
+                    if (!string.IsNullOrWhiteSpace(characterName))
+                    {
+                        characterName = StripIconMarkup(characterName.Trim());
+                        MelonLogger.Msg($"[Coliseum Challenger] {characterName}");
+                        FFVI_ScreenReaderMod.SpeakText(characterName, interrupt: true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Error in ColosseumController.SelectChallenger patch: {ex.Message}");
+                }
             }
         }
     }

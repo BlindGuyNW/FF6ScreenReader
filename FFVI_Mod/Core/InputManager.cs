@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using Il2Cpp;
 using MelonLoader;
+using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.ModTextTranslator;
 using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
 using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
@@ -280,6 +281,67 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
+            // F1: Announce walk/run state
+            if (Input.GetKeyDown(KeyCode.F1))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    CoroutineManager.StartUntracked(AnnounceWalkRunState());
+            }
+
+            // F3: Announce encounter state
+            if (Input.GetKeyDown(KeyCode.F3))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    CoroutineManager.StartUntracked(AnnounceEncounterState());
+            }
+
+        }
+
+        private static System.Collections.IEnumerator AnnounceWalkRunState()
+        {
+            // Wait 3 frames for game to process the toggle
+            yield return null;
+            yield return null;
+            yield return null;
+            try
+            {
+                var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
+                var player = playerController?.fieldPlayer;
+                if (player == null) yield break;
+
+                bool isDashing = (int)player.moveState == 1; // Dush
+                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
+                bool autoDash = (userDataManager?.Config?.IsAutoDash ?? 0) != 0;
+                bool isRunning = autoDash != isDashing; // XOR logic
+
+                FFVI_ScreenReaderMod.SpeakText(isRunning ? T("Run") : T("Walk"));
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading walk/run state: {ex.Message}");
+            }
+        }
+
+        private static System.Collections.IEnumerator AnnounceEncounterState()
+        {
+            yield return null;
+            try
+            {
+                var userData = Il2CppLast.Management.UserDataManager.Instance();
+                if (userData?.CheatSettingsData != null)
+                {
+                    bool enabled = userData.CheatSettingsData.IsEnableEncount;
+                    FFVI_ScreenReaderMod.SpeakText(enabled ? T("Encounters on") : T("Encounters off"));
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading encounter state: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -453,6 +515,10 @@ namespace FFVI_ScreenReader.Core
 
         private void HandleItemInfoKey()
         {
+            // Try Blitz input sequence first (field menu only)
+            if (Patches.SpecialAbilityContentListController_SelectContent_AbilityMenu_Patch.TryAnnounceBlitzSequence())
+                return;
+
             // Try esper details re-read first
             if (Patches.MagicStoneDetailsController_Show_Patch.TryReannounceEsperDetails())
                 return;

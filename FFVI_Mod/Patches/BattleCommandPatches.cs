@@ -369,7 +369,7 @@ namespace FFVI_ScreenReader.Patches
                     if (contentView != null)
                     {
                         var mpText = contentView.valueText;
-                        if (mpText != null && !string.IsNullOrWhiteSpace(mpText.text))
+                        if (mpText != null && !string.IsNullOrWhiteSpace(mpText.text) && mpText.text.Trim() != "0")
                         {
                             announcement += string.Format(T(", MP {0}"), mpText.text);
                         }
@@ -384,6 +384,10 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(abilityName + ":"))
+                            description = description.Substring(abilityName.Length + 1).TrimStart();
+
                         announcement += $", {description}";
                     }
                 }
@@ -465,7 +469,7 @@ namespace FFVI_ScreenReader.Patches
                     if (contentView != null && contentView.valueText != null)
                     {
                         string mpVal = contentView.valueText.text;
-                        if (!string.IsNullOrWhiteSpace(mpVal))
+                        if (!string.IsNullOrWhiteSpace(mpVal) && mpVal.Trim() != "0")
                             mpCost = mpVal;
                     }
                 }
@@ -522,6 +526,10 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
+                // Only announce in battle — field menu is handled by AbilityMenuPatches
+                if (BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter == null)
+                    return;
+
                 if (__instance == null || targetCursor == null)
                 {
                     return;
@@ -595,6 +603,10 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(toolName + ":"))
+                            description = description.Substring(toolName.Length + 1).TrimStart();
+
                         announcement += $", {description}";
                     }
                 }

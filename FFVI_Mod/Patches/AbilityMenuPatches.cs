@@ -261,6 +261,31 @@ namespace FFVI_ScreenReader.Patches
     {
         private static string lastAnnouncement = "";
 
+        /// <summary>
+        /// Stores the MesIdName of the currently selected special ability (Blitz/Tool)
+        /// so the I key can look up Blitz input sequences.
+        /// </summary>
+        public static string CurrentMesIdName { get; private set; }
+
+        /// <summary>
+        /// Attempts to announce the Blitz input sequence for the currently selected ability.
+        /// Returns true if a Blitz sequence was found and spoken.
+        /// </summary>
+        public static bool TryAnnounceBlitzSequence()
+        {
+            if (string.IsNullOrEmpty(CurrentMesIdName))
+                return false;
+
+            if (BlitzData.TryGetBlitzSequence(CurrentMesIdName, out string sequence))
+            {
+                MelonLogger.Msg($"[Blitz Input] {sequence}");
+                FFVI_ScreenReaderMod.SpeakText(sequence);
+                return true;
+            }
+
+            return false;
+        }
+
         [HarmonyPostfix]
         public static void Postfix(SpecialAbilityContentListController __instance, Cursor targetCursor)
         {
@@ -307,6 +332,9 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Track the currently selected ability for Blitz input lookup
+                CurrentMesIdName = mesIdName;
+
                 var messageManager = MessageManager.Instance;
                 if (messageManager == null)
                 {
@@ -338,7 +366,11 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += string.Format(T(". {0}"), description);
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(abilityName + ":"))
+                            description = description.Substring(abilityName.Length + 1).TrimStart();
+
+                        announcement += $". {description}";
                     }
                 }
 
@@ -349,7 +381,7 @@ namespace FFVI_ScreenReader.Patches
                 }
                 lastAnnouncement = announcement;
 
-                MelonLogger.Msg($"[Special Ability] {announcement}");
+                MelonLogger.Msg($"[Special Ability] MesIdName={mesIdName}, {announcement}");
                 FFVI_ScreenReaderMod.SpeakText(announcement);
             }
             catch (Exception ex)
@@ -674,7 +706,7 @@ namespace FFVI_ScreenReader.Patches
                         if (!string.IsNullOrWhiteSpace(mpCost))
                         {
                             mpCost = StripIconMarkup(mpCost);
-                            if (!string.IsNullOrWhiteSpace(mpCost))
+                            if (!string.IsNullOrWhiteSpace(mpCost) && mpCost.Trim() != "0")
                             {
                                 announcement += string.Format(T(", MP Cost {0}"), mpCost);
                             }
