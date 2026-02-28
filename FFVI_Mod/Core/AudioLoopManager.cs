@@ -7,6 +7,7 @@ using Il2CppLast.Entity.Field;
 using Il2CppLast.Map;
 using MelonLoader;
 using UnityEngine;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -105,8 +106,8 @@ namespace FFVI_ScreenReader.Core
 
             PreferencesManager.SaveWallTones(enableWallTones);
 
-            string status = enableWallTones ? "on" : "off";
-            FFVI_ScreenReaderMod.SpeakText($"Wall tones {status}");
+            string status = enableWallTones ? T("on") : T("off");
+            FFVI_ScreenReaderMod.SpeakText(string.Format(T("Wall tones {0}"), status));
         }
 
         public void ToggleFootsteps()
@@ -115,8 +116,8 @@ namespace FFVI_ScreenReader.Core
 
             PreferencesManager.SaveFootsteps(enableFootsteps);
 
-            string status = enableFootsteps ? "on" : "off";
-            FFVI_ScreenReaderMod.SpeakText($"Footsteps {status}");
+            string status = enableFootsteps ? T("on") : T("off");
+            FFVI_ScreenReaderMod.SpeakText(string.Format(T("Footsteps {0}"), status));
         }
 
         public void ToggleAudioBeacons()
@@ -130,8 +131,8 @@ namespace FFVI_ScreenReader.Core
 
             PreferencesManager.SaveAudioBeacons(enableAudioBeacons);
 
-            string status = enableAudioBeacons ? "on" : "off";
-            FFVI_ScreenReaderMod.SpeakText($"Audio beacons {status}");
+            string status = enableAudioBeacons ? T("on") : T("off");
+            FFVI_ScreenReaderMod.SpeakText(string.Format(T("Audio beacons {0}"), status));
         }
 
         public void ToggleExpCounter()
@@ -140,8 +141,8 @@ namespace FFVI_ScreenReader.Core
 
             PreferencesManager.SaveExpCounter(enableExpCounter);
 
-            string status = enableExpCounter ? "on" : "off";
-            FFVI_ScreenReaderMod.SpeakText($"EXP counter {status}");
+            string status = enableExpCounter ? T("on") : T("off");
+            FFVI_ScreenReaderMod.SpeakText(string.Format(T("EXP counter {0}"), status));
         }
 
         #endregion

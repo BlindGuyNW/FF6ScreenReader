@@ -1,4 +1,5 @@
 using System;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Utils
 {
@@ -22,21 +23,21 @@ namespace FFVI_ScreenReader.Utils
             // The rotation system has East/West reversed, so we swap them
             // N: 337.5-22.5 (0), NW: 22.5-67.5 (45), W: 67.5-112.5 (90), etc.
             if (normalized >= 337.5f || normalized < 22.5f)
-                return "North";
+                return T("North");
             else if (normalized >= 22.5f && normalized < 67.5f)
-                return "Northwest";  // Swapped from NE
+                return T("Northwest");  // Swapped from NE
             else if (normalized >= 67.5f && normalized < 112.5f)
-                return "West";  // Swapped from E
+                return T("West");  // Swapped from E
             else if (normalized >= 112.5f && normalized < 157.5f)
-                return "Southwest";  // Swapped from SE
+                return T("Southwest");  // Swapped from SE
             else if (normalized >= 157.5f && normalized < 202.5f)
-                return "South";
+                return T("South");
             else if (normalized >= 202.5f && normalized < 247.5f)
-                return "Southeast";  // Swapped from SW
+                return T("Southeast");  // Swapped from SW
             else if (normalized >= 247.5f && normalized < 292.5f)
-                return "East";  // Swapped from W
+                return T("East");  // Swapped from W
             else // 292.5 - 337.5
-                return "Northeast";  // Swapped from NW
+                return T("Northeast");  // Swapped from NW
         }
 
         /// <summary>
@@ -48,15 +49,15 @@ namespace FFVI_ScreenReader.Utils
         {
             // Divide altitude into meaningful levels
             if (altitudeRatio <= 0.0f)
-                return "Ground level";
+                return T("Ground level");
             else if (altitudeRatio < 0.33f)
-                return "Low altitude";
+                return T("Low altitude");
             else if (altitudeRatio < 0.67f)
-                return "Cruising altitude";
+                return T("Cruising altitude");
             else if (altitudeRatio < 1.0f)
-                return "High altitude";
+                return T("High altitude");
             else
-                return "Maximum altitude";
+                return T("Maximum altitude");
         }
     }
 }

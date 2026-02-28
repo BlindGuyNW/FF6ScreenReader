@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using Il2Cpp;
 using MelonLoader;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
 using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
 
@@ -71,11 +72,11 @@ namespace FFVI_ScreenReader.Core
             {
                 if (FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter != null)
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
                 }
                 else
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Mod menu");
+                    FFVI_ScreenReaderMod.SpeakText(T("Mod menu"));
                     ModMenu.Open();
                 }
                 return;
@@ -241,7 +242,7 @@ namespace FFVI_ScreenReader.Core
             if (Input.GetKeyDown(KeyCode.Quote))
             {
                 if (IsInBattle())
-                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
                 else
                     mod.ToggleFootsteps();
             }
@@ -250,7 +251,7 @@ namespace FFVI_ScreenReader.Core
             if (Input.GetKeyDown(KeyCode.Semicolon))
             {
                 if (IsInBattle())
-                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
                 else
                     mod.ToggleWallTones();
             }
@@ -259,7 +260,7 @@ namespace FFVI_ScreenReader.Core
             if (Input.GetKeyDown(KeyCode.Alpha9))
             {
                 if (IsInBattle())
-                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
                 else
                     mod.ToggleAudioBeacons();
             }
@@ -268,14 +269,14 @@ namespace FFVI_ScreenReader.Core
             if (Input.GetKeyDown(KeyCode.F5))
             {
                 if (IsInBattle())
-                    FFVI_ScreenReaderMod.SpeakText("Unavailable in battle");
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
                 else
                 {
                     int current = PreferencesManager.EnemyHPDisplay;
                     int next = (current + 1) % 3;
                     PreferencesManager.SetEnemyHPDisplay(next);
-                    string[] labels = { "Numbers", "Percentage", "Hidden" };
-                    FFVI_ScreenReaderMod.SpeakText($"Enemy HP: {labels[next]}");
+                    string[] labels = { T("Numbers"), T("Percentage"), T("Hidden") };
+                    FFVI_ScreenReaderMod.SpeakText(string.Format(T("Enemy HP: {0}"), labels[next]));
                 }
             }
 

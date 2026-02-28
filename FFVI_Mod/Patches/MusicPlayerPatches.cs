@@ -8,6 +8,7 @@ using FFVI_ScreenReader.Menus;
 using FFVI_ScreenReader.Utils;
 using Il2CppLast.Management;
 using Il2CppLast.UI.KeyInput;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -71,7 +72,7 @@ namespace FFVI_ScreenReader.Patches
         private static IEnumerator AnnounceMusicPlayerEntry()
         {
             yield return null;
-            FFVI_ScreenReaderMod.SpeakText("Music Player", true);
+            FFVI_ScreenReaderMod.SpeakText(T("Music Player"), true);
 
             // Poll CachedFocusedPtr — SetFocus fires during entry with correct pointer,
             // cached by the suppression path in the SetFocus patch.
@@ -176,7 +177,7 @@ namespace FFVI_ScreenReader.Patches
                 if (!MusicPlayerStateTracker.IsInMusicPlayer) return;
 
                 // LoopKeys: PlaybackOn=0, PlaybackOff=1
-                string announcement = key == 0 ? "Play All On" : "Play All Off";
+                string announcement = key == 0 ? T("Play All On") : T("Play All Off");
                 FFVI_ScreenReaderMod.SpeakText(announcement, true);
             }
             catch (Exception ex)
@@ -213,7 +214,7 @@ namespace FFVI_ScreenReader.Patches
                 if (instancePtr == IntPtr.Zero) return;
 
                 int listType = *(int*)((byte*)instancePtr.ToPointer() + MusicPlayerStateTracker.OFFSET_CURRENT_LIST_TYPE);
-                string toggleLabel = listType == 1 ? "Original" : "Arrangement";
+                string toggleLabel = listType == 1 ? T("Original") : T("Arrangement");
                 FFVI_ScreenReaderMod.SpeakText(toggleLabel, true);
 
                 // Read and announce current song from cached focused pointer

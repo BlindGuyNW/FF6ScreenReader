@@ -96,6 +96,28 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "NextIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
+                }
+
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -201,13 +223,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "NextIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -300,6 +322,28 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "PrevIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
+                }
+
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -405,13 +449,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "PrevIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -504,6 +548,28 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "SkipNextIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
+                }
+
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -609,13 +675,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "SkipNextIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -708,6 +774,28 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "SkipPrevIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
+                }
+
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -813,13 +901,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "SkipPrevIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {

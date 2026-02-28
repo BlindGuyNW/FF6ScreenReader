@@ -6,6 +6,7 @@ using Il2CppLast.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -147,14 +148,14 @@ namespace FFVI_ScreenReader.Patches
                 // Build announcement
                 string announcement = "";
                 if (!string.IsNullOrEmpty(wagerName))
-                    announcement += $"Wager {wagerName}";
+                    announcement += string.Format(T("Wager {0}"), wagerName);
                 if (!string.IsNullOrEmpty(rewardName))
-                    announcement += $", Win {rewardName}";
+                    announcement += string.Format(T(", Win {0}"), rewardName);
                 if (!string.IsNullOrEmpty(monsterName))
-                    announcement += $", Fight {monsterName}";
+                    announcement += string.Format(T(", Fight {0}"), monsterName);
 
                 if (!string.IsNullOrEmpty(announcement))
-                    announcement += ". Yes or No";
+                    announcement += T(". Yes or No");
 
                 if (string.IsNullOrEmpty(announcement))
                     yield break;

@@ -3,6 +3,7 @@ using HarmonyLib;
 using MelonLoader;
 using Il2CppLast.FF6.Opera;
 using FFVI_ScreenReader.Core;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -28,19 +29,19 @@ namespace FFVI_ScreenReader.Patches
                 // Announce results for interactive button presses (only when state changes)
                 if (__instance.clickedInteractiveIconButton && !lastClickedState)
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Success");
+                    FFVI_ScreenReaderMod.SpeakText(T("Success"));
                 }
                 lastClickedState = __instance.clickedInteractiveIconButton;
 
                 if (__instance.isFailedInteractiveIconButton && !lastFailedState)
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Failed");
+                    FFVI_ScreenReaderMod.SpeakText(T("Failed"));
                 }
                 lastFailedState = __instance.isFailedInteractiveIconButton;
 
                 if (__instance.isInteractiveTimeup && !lastTimeupState)
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Out of time");
+                    FFVI_ScreenReaderMod.SpeakText(T("Out of time"));
                 }
                 lastTimeupState = __instance.isInteractiveTimeup;
             }

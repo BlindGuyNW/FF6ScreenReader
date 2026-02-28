@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using MelonLoader;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -25,7 +26,8 @@ namespace FFVI_ScreenReader.Core
 
         private abstract class MenuItem
         {
-            public string Name { get; protected set; }
+            protected string nameKey;
+            public string Name => T(nameKey);
             public abstract string GetValueString();
             public abstract void Adjust(int delta);
             public abstract void Toggle();
@@ -38,12 +40,12 @@ namespace FFVI_ScreenReader.Core
 
             public ToggleItem(string name, Func<bool> getter, Action toggle)
             {
-                Name = name;
+                nameKey = name;
                 this.getter = getter;
                 this.toggle = toggle;
             }
 
-            public override string GetValueString() => getter() ? "On" : "Off";
+            public override string GetValueString() => getter() ? T("On") : T("Off");
             public override void Adjust(int delta) => toggle();
             public override void Toggle() => toggle();
         }
@@ -55,7 +57,7 @@ namespace FFVI_ScreenReader.Core
 
             public VolumeItem(string name, Func<int> getter, Action<int> setter)
             {
-                Name = name;
+                nameKey = name;
                 this.getter = getter;
                 this.setter = setter;
             }
@@ -79,14 +81,14 @@ namespace FFVI_ScreenReader.Core
 
         private class EnumItem : MenuItem
         {
-            private readonly string[] options;
+            private readonly string[] optionKeys;
             private readonly Func<int> getter;
             private readonly Action<int> setter;
 
-            public EnumItem(string name, string[] options, Func<int> getter, Action<int> setter)
+            public EnumItem(string name, string[] optionKeys, Func<int> getter, Action<int> setter)
             {
-                Name = name;
-                this.options = options;
+                nameKey = name;
+                this.optionKeys = optionKeys;
                 this.getter = getter;
                 this.setter = setter;
             }
@@ -94,17 +96,17 @@ namespace FFVI_ScreenReader.Core
             public override string GetValueString()
             {
                 int index = getter();
-                if (index >= 0 && index < options.Length)
-                    return options[index];
-                return "Unknown";
+                if (index >= 0 && index < optionKeys.Length)
+                    return T(optionKeys[index]);
+                return T("Unknown");
             }
 
             public override void Adjust(int delta)
             {
                 int current = getter();
                 int newValue = current + delta;
-                if (newValue < 0) newValue = options.Length - 1;
-                if (newValue >= options.Length) newValue = 0;
+                if (newValue < 0) newValue = optionKeys.Length - 1;
+                if (newValue >= optionKeys.Length) newValue = 0;
                 setter(newValue);
             }
 
@@ -115,7 +117,7 @@ namespace FFVI_ScreenReader.Core
         {
             public SectionHeader(string name)
             {
-                Name = name;
+                nameKey = name;
             }
 
             public override string GetValueString() => "";
@@ -129,7 +131,7 @@ namespace FFVI_ScreenReader.Core
 
             public ActionItem(string name, Action action)
             {
-                Name = name;
+                nameKey = name;
                 this.action = action;
             }
 
@@ -405,7 +407,7 @@ namespace FFVI_ScreenReader.Core
         {
             try
             {
-                WindowsFocusHelper.StealFocus("FFVI_ModMenu");
+                WindowsFocusHelper.StealFocus(T("Mod menu"));
             }
             catch (Exception ex)
             {

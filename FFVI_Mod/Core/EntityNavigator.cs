@@ -6,6 +6,7 @@ using FFVI_ScreenReader.Field;
 using FFVI_ScreenReader.Core.Filters;
 using Il2Cpp;
 using Il2CppLast.Map;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -447,19 +448,19 @@ namespace FFVI_ScreenReader.Core
             switch (category)
             {
                 case EntityCategory.All:
-                    return "All";
+                    return T("All");
                 case EntityCategory.Chests:
-                    return "Chests";
+                    return T("Chests");
                 case EntityCategory.NPCs:
-                    return "NPCs";
+                    return T("NPCs");
                 case EntityCategory.MapExits:
-                    return "Map Exits";
+                    return T("Map Exits");
                 case EntityCategory.Events:
-                    return "Events";
+                    return T("Events");
                 case EntityCategory.Vehicles:
-                    return "Vehicles";
+                    return T("Vehicles");
                 case EntityCategory.Waypoints:
-                    return "Waypoints";
+                    return T("Waypoints");
                 default:
                     return category.ToString();
             }

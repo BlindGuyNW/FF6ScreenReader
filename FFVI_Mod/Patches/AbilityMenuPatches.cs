@@ -12,6 +12,7 @@ using Il2CppSerial.Template.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -190,7 +191,7 @@ namespace FFVI_ScreenReader.Patches
                             mpText = mpText.Trim();
                             if (mpText != "0" && mpText != "-")
                             {
-                                announcement += $", MP {mpText}";
+                                announcement += string.Format(T(", MP {0}"), mpText);
                             }
                         }
                     }
@@ -210,7 +211,7 @@ namespace FFVI_ScreenReader.Patches
                         int skillLevel = abilityData.SkillLevel;
                         if (skillLevel < 100 && skillLevel > 0)
                         {
-                            announcement += $", learning, {skillLevel} percent";
+                            announcement += string.Format(T(", learning, {0} percent"), skillLevel);
                         }
                         // If SkillLevel == 100, don't announce learning progress (already mastered)
                         // If SkillLevel == 0, the ability hasn't started learning yet
@@ -228,7 +229,7 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
                 }
 
@@ -337,7 +338,7 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
                 }
 
@@ -416,7 +417,7 @@ namespace FFVI_ScreenReader.Patches
                 // Indicate if this command is already equipped in one of the 4 slots
                 if (equipData.IsEquiped)
                 {
-                    announcement += ", equipped";
+                    announcement += T(", equipped");
                 }
 
                 // Add description if available
@@ -425,7 +426,7 @@ namespace FFVI_ScreenReader.Patches
                     string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
                 }
 
@@ -506,7 +507,7 @@ namespace FFVI_ScreenReader.Patches
 
                 if (equipData == null || string.IsNullOrWhiteSpace(equipData.NameMessageId))
                 {
-                    announcement = $"Slot {slotNumber}: Empty";
+                    announcement = string.Format(T("Slot {0}: Empty"), slotNumber);
                 }
                 else
                 {
@@ -519,15 +520,15 @@ namespace FFVI_ScreenReader.Patches
                     string commandName = StripIconMarkup(messageManager.GetMessage(equipData.NameMessageId));
                     if (string.IsNullOrWhiteSpace(commandName))
                     {
-                        announcement = $"Slot {slotNumber}: Empty";
+                        announcement = string.Format(T("Slot {0}: Empty"), slotNumber);
                     }
                     else
                     {
-                        announcement = $"Slot {slotNumber}: {commandName}";
+                        announcement = string.Format(T("Slot {0}: {1}"), slotNumber, commandName);
 
                         if (equipData.IsFixed)
                         {
-                            announcement += ", fixed";
+                            announcement += T(", fixed");
                         }
 
                         // Add description if available
@@ -536,7 +537,7 @@ namespace FFVI_ScreenReader.Patches
                             string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
                             if (!string.IsNullOrWhiteSpace(description))
                             {
-                                announcement += $". {description}";
+                                announcement += string.Format(T(". {0}"), description);
                             }
                         }
                     }
@@ -627,7 +628,7 @@ namespace FFVI_ScreenReader.Patches
                 bool isOwned = magicStoneData.IsOwned;
                 if (!isOwned)
                 {
-                    announcement += " - NOT OBTAINED";
+                    announcement += T(" - NOT OBTAINED");
                 }
                 else
                 {
@@ -642,7 +643,7 @@ namespace FFVI_ScreenReader.Patches
 
                             if (equippedEsperId == thisEsperId && equippedEsperId > 0)
                             {
-                                announcement += " - EQUIPPED";
+                                announcement += T(" - EQUIPPED");
                             }
                         }
                     }
@@ -659,7 +660,7 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
                 }
 
@@ -675,7 +676,7 @@ namespace FFVI_ScreenReader.Patches
                             mpCost = StripIconMarkup(mpCost);
                             if (!string.IsNullOrWhiteSpace(mpCost))
                             {
-                                announcement += $", MP Cost {mpCost}";
+                                announcement += string.Format(T(", MP Cost {0}"), mpCost);
                             }
                         }
                     }
@@ -839,7 +840,7 @@ namespace FFVI_ScreenReader.Patches
                 System.Collections.Generic.List<string> details = new System.Collections.Generic.List<string>();
 
                 // Check equipped status FIRST - find which character has this esper
-                string equippedStatus = "Not equipped";
+                string equippedStatus = T("Not equipped");
 
                 if (lastMagicStoneData != null && lastCandidates != null)
                 {
@@ -856,7 +857,7 @@ namespace FFVI_ScreenReader.Patches
 
                             if (string.IsNullOrWhiteSpace(characterName))
                             {
-                                characterName = "Unknown";
+                                characterName = T("Unknown");
                             }
                             else
                             {
@@ -867,11 +868,11 @@ namespace FFVI_ScreenReader.Patches
                             // Check if it's the currently selected character
                             if (lastTarget != null && character.Id == lastTarget.Id)
                             {
-                                equippedStatus = $"EQUIPPED to {characterName}";
+                                equippedStatus = string.Format(T("EQUIPPED to {0}"), characterName);
                             }
                             else
                             {
-                                equippedStatus = $"Equipped to {characterName}";
+                                equippedStatus = string.Format(T("Equipped to {0}"), characterName);
                             }
 
                             MelonLogger.Msg($"[Esper Show] Equipped to: {characterName}");
@@ -917,14 +918,14 @@ namespace FFVI_ScreenReader.Patches
                             {
                                 if (contentView.masterImage != null && contentView.masterImage.gameObject.activeInHierarchy)
                                 {
-                                    progress = "Mastered";
+                                    progress = T("Mastered");
                                 }
                                 else if (contentView.skillLevelText != null)
                                 {
                                     string levelText = contentView.skillLevelText.text;
                                     if (!string.IsNullOrWhiteSpace(levelText))
                                     {
-                                        progress = $"{levelText.Trim()}%";
+                                        progress = string.Format(T("{0}%"), levelText.Trim());
                                     }
                                 }
                             }
@@ -941,13 +942,13 @@ namespace FFVI_ScreenReader.Patches
 
                                 if (!string.IsNullOrWhiteSpace(progress))
                                 {
-                                    abilityEntry += $", {progress}";
+                                    abilityEntry += string.Format(T(", {0}"), progress);
                                 }
 
                                 if (!string.IsNullOrWhiteSpace(apCost))
                                 {
                                     apCost = StripIconMarkup(apCost);
-                                    abilityEntry += $", {apCost}";
+                                    abilityEntry += string.Format(T(", {0}"), apCost);
                                 }
 
                                 abilities.Add(abilityEntry);
@@ -958,7 +959,7 @@ namespace FFVI_ScreenReader.Patches
                     if (abilities.Count > 0)
                     {
                         // Announce all abilities with their AP costs
-                        details.Add($"Teaches {abilities.Count} abilities: " + string.Join(", ", abilities));
+                        details.Add(string.Format(T("Teaches {0} abilities: "), abilities.Count) + string.Join(", ", abilities));
                     }
                 }
                 else
@@ -982,7 +983,7 @@ namespace FFVI_ScreenReader.Patches
 
                         if (!string.IsNullOrWhiteSpace(statBonus))
                         {
-                            details.Add($"Level up bonus: {statBonus}");
+                            details.Add(string.Format(T("Level up bonus: {0}"), statBonus));
                         }
                     }
                 }
@@ -1127,7 +1128,7 @@ namespace FFVI_ScreenReader.Patches
                         int currentMP = parameter.CurrentMP;
                         int maxMP = parameter.ConfirmedMaxMp();
 
-                        announcement += $", HP {currentHP}/{maxHP}, MP {currentMP}/{maxMP}";
+                        announcement += string.Format(T(", HP {0}/{1}, MP {2}/{3}"), currentHP, maxHP, currentMP, maxMP);
 
                         // Get status conditions
                         var conditionList = parameter.ConfirmedConditionList();
@@ -1158,7 +1159,7 @@ namespace FFVI_ScreenReader.Patches
 
                                 if (statusNames.Count > 0)
                                 {
-                                    announcement += $", {string.Join(", ", statusNames)}";
+                                    announcement += string.Format(T(", {0}"), string.Join(", ", statusNames));
                                 }
                             }
                         }

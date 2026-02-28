@@ -4,6 +4,7 @@ using MelonLoader;
 using Il2CppLast.UI.KeyInput;
 using FFVI_ScreenReader.Core;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -127,7 +128,7 @@ namespace FFVI_ScreenReader.Menus
             }
             else
             {
-                FFVI_ScreenReaderMod.SpeakText("Bottom");
+                FFVI_ScreenReaderMod.SpeakText(T("Bottom"));
             }
         }
 
@@ -142,7 +143,7 @@ namespace FFVI_ScreenReader.Menus
             }
             else
             {
-                FFVI_ScreenReaderMod.SpeakText("Top");
+                FFVI_ScreenReaderMod.SpeakText(T("Top"));
             }
         }
 
@@ -211,7 +212,7 @@ namespace FFVI_ScreenReader.Menus
 
                 name = StripIconMarkup(name);
                 int count = data.Count;
-                return count > 0 ? $"{name}, quantity {count}" : name;
+                return count > 0 ? string.Format(T("{0}, quantity {1}"), name, count) : name;
             }
             catch (System.Exception ex)
             {
@@ -310,7 +311,7 @@ namespace FFVI_ScreenReader.Menus
                         parts.Add(abilityName);
                 }
 
-                return parts.Count > 0 ? "Properties: " + string.Join(". ", parts) : null;
+                return parts.Count > 0 ? string.Format(T("Properties: {0}"), string.Join(". ", parts)) : null;
             }
             catch (System.Exception ex)
             {
@@ -395,9 +396,9 @@ namespace FFVI_ScreenReader.Menus
                     }
 
                     if (enabledElements.Count > 0)
-                        sections.Add($"{categoryName}: {string.Join(", ", enabledElements)}");
+                        sections.Add(string.Format(T("{0}: {1}"), categoryName, string.Join(", ", enabledElements)));
                     else
-                        sections.Add($"{categoryName}: none");
+                        sections.Add(string.Format(T("{0}: {1}"), categoryName, T("none")));
                 }
             }
             catch (System.Exception ex)
@@ -410,7 +411,7 @@ namespace FFVI_ScreenReader.Menus
         {
             // Primary: hardcoded dictionary (sprite names are numbered, not named by element)
             if (attributeType >= 0 && AttributeTypeNames.TryGetValue(attributeType, out string name))
-                return name;
+                return T(name);
 
             // Fallback: try keyword matching from enableIconName
             if (!string.IsNullOrEmpty(enableIconName))
@@ -422,13 +423,13 @@ namespace FFVI_ScreenReader.Menus
                     {
                         string displayName = char.ToUpper(keyword[0]) + keyword.Substring(1);
                         if (keyword == "thunder") displayName = "Lightning";
-                        return displayName;
+                        return T(displayName);
                     }
                 }
             }
 
             // Last resort: report raw type
-            return $"Element {attributeType}";
+            return string.Format(T("Element {0}"), attributeType);
         }
 
         private static string BuildMagicSection(ItemEquipmentDetailView detailView)
@@ -459,7 +460,7 @@ namespace FFVI_ScreenReader.Menus
                         parts.Add(magicName);
                 }
 
-                return parts.Count > 0 ? "Magic: " + string.Join(". ", parts) : null;
+                return parts.Count > 0 ? string.Format(T("Magic: {0}"), string.Join(". ", parts)) : null;
             }
             catch (System.Exception ex)
             {
@@ -536,7 +537,7 @@ namespace FFVI_ScreenReader.Menus
                     }
                 }
 
-                return names.Count > 0 ? "Can equip: " + string.Join(", ", names) : null;
+                return names.Count > 0 ? string.Format(T("Can equip: {0}"), string.Join(", ", names)) : null;
             }
             catch (System.Exception ex)
             {

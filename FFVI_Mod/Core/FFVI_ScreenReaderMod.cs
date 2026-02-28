@@ -4,6 +4,7 @@ using FFVI_ScreenReader.Field;
 using UnityEngine;
 using Il2Cpp;
 using Il2CppLast.Map;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 [assembly: MelonInfo(typeof(FFVI_ScreenReader.Core.FFVI_ScreenReaderMod), "FFVI Screen Reader", "1.0.0", "Zachary Kline")]
 [assembly: MelonGame("SQUARE ENIX, Inc.", "FINAL FANTASY VI")]
@@ -71,6 +72,7 @@ namespace FFVI_ScreenReader.Core
             PreferencesManager.Initialize();
             ModMenu.Initialize();
             Utils.EntityTranslator.Initialize();
+            Utils.ModTextTranslator.Initialize();
 
             // Load saved preferences
             filterByPathfinding = PreferencesManager.PathfindingFilterDefault;
@@ -217,7 +219,7 @@ namespace FFVI_ScreenReader.Core
                     {
                         // Map has changed, announce the new map
                         string mapName = Field.MapNameResolver.GetCurrentMapName();
-                        SpeakText($"Entering {mapName}", interrupt: false);
+                        SpeakText(string.Format(T("Entering {0}"), mapName), interrupt: false);
                         lastAnnouncedMapId = currentMapId;
 
                         // Reset vehicle landing state and vehicle type map for the new map
@@ -245,14 +247,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entities nearby");
+                SpeakText(T("No entities nearby"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Not in field");
+                SpeakText(T("Not in field"));
                 return;
             }
 
@@ -275,7 +277,7 @@ namespace FFVI_ScreenReader.Core
             }
             else
             {
-                announcement = "no path";
+                announcement = T("no path");
             }
 
             SpeakText(announcement);
@@ -292,11 +294,11 @@ namespace FFVI_ScreenReader.Core
                 // Either no entities or no pathable entities found
                 if (entityNavigator.EntityCount == 0)
                 {
-                    SpeakText("No entities nearby");
+                    SpeakText(T("No entities nearby"));
                 }
                 else
                 {
-                    SpeakText("No pathable entities found");
+                    SpeakText(T("No pathable entities found"));
                 }
             }
         }
@@ -312,11 +314,11 @@ namespace FFVI_ScreenReader.Core
                 // Either no entities or no pathable entities found
                 if (entityNavigator.EntityCount == 0)
                 {
-                    SpeakText("No entities nearby");
+                    SpeakText(T("No entities nearby"));
                 }
                 else
                 {
-                    SpeakText("No pathable entities found");
+                    SpeakText(T("No pathable entities found"));
                 }
             }
         }
@@ -326,14 +328,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entities nearby");
+                SpeakText(T("No entities nearby"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Not in field");
+                SpeakText(T("Not in field"));
                 return;
             }
 
@@ -352,8 +354,8 @@ namespace FFVI_ScreenReader.Core
             );
 
             // Announce entity info + path status + count at the end
-            string countSuffix = $", {entityNavigator.CurrentIndex + 1} of {entityNavigator.EntityCount}";
-            string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}, no path{countSuffix}";
+            string countSuffix = string.Format(T(", {0} of {1}"), entityNavigator.CurrentIndex + 1, entityNavigator.EntityCount);
+            string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}{T(", no path")}{countSuffix}";
             SpeakText(announcement);
         }
 
@@ -399,7 +401,7 @@ namespace FFVI_ScreenReader.Core
         {
             if (entityNavigator.CurrentCategory == EntityCategory.All)
             {
-                SpeakText("Already in All category");
+                SpeakText(T("Already in All category"));
                 return;
             }
 
@@ -420,8 +422,8 @@ namespace FFVI_ScreenReader.Core
             // Save to preferences
             PreferencesManager.SavePathfindingFilter(filterByPathfinding);
 
-            string status = filterByPathfinding ? "on" : "off";
-            SpeakText($"Pathfinding filter {status}");
+            string status = filterByPathfinding ? T("on") : T("off");
+            SpeakText(string.Format(T("Pathfinding filter {0}"), status));
         }
 
         internal void ToggleMapExitFilter()
@@ -435,8 +437,8 @@ namespace FFVI_ScreenReader.Core
             // Save to preferences
             PreferencesManager.SaveMapExitFilter(filterMapExits);
 
-            string status = filterMapExits ? "on" : "off";
-            SpeakText($"Map exit filter {status}");
+            string status = filterMapExits ? T("on") : T("off");
+            SpeakText(string.Format(T("Map exit filter {0}"), status));
         }
 
         internal void ToggleToLayerFilter()
@@ -449,8 +451,8 @@ namespace FFVI_ScreenReader.Core
             // Save to preferences
             PreferencesManager.SaveToLayerFilter(filterToLayer);
 
-            string status = filterToLayer ? "on" : "off";
-            SpeakText($"Layer transition filter {status}");
+            string status = filterToLayer ? T("on") : T("off");
+            SpeakText(string.Format(T("Layer transition filter {0}"), status));
         }
 
         // Static accessors for ModMenu bindings
@@ -482,7 +484,7 @@ namespace FFVI_ScreenReader.Core
             string categoryName = EntityNavigator.GetCategoryName(entityNavigator.CurrentCategory);
             int entityCount = entityNavigator.EntityCount;
 
-            string announcement = $"Category: {categoryName}, {entityCount} {(entityCount == 1 ? "entity" : "entities")}";
+            string announcement = string.Format(T("Category: {0}, {1} {2}"), categoryName, entityCount, entityCount == 1 ? T("entity") : T("entities"));
             SpeakText(announcement);
         }
 
@@ -491,14 +493,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entity selected");
+                SpeakText(T("No entity selected"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Player not available");
+                SpeakText(T("Player not available"));
                 return;
             }
 
@@ -515,17 +517,17 @@ namespace FFVI_ScreenReader.Core
             // Announce direction — use display-friendly name for the entity
             string direction = GetDirectionName(offset);
             string entityLabel = entity.DisplayName;
-            SpeakText($"Teleported {direction} of {entityLabel}");
+            SpeakText(string.Format(T("Teleported {0} of {1}"), direction, entityLabel));
             LoggerInstance.Msg($"Teleported {direction} of {entityLabel} to position {newPos}");
         }
 
         private string GetDirectionName(Vector2 offset)
         {
-            if (offset.y > 0) return "north";
-            if (offset.y < 0) return "south";
-            if (offset.x < 0) return "west";
-            if (offset.x > 0) return "east";
-            return "unknown";
+            if (offset.y > 0) return T("north");
+            if (offset.y < 0) return T("south");
+            if (offset.x < 0) return T("west");
+            if (offset.x > 0) return T("east");
+            return T("unknown");
         }
 
         private void AnnounceCurrentCharacterStatus()
@@ -537,13 +539,13 @@ namespace FFVI_ScreenReader.Core
 
                 if (activeCharacter == null)
                 {
-                    SpeakText("Not in battle or no active character");
+                    SpeakText(T("Not in battle or no active character"));
                     return;
                 }
 
                 if (activeCharacter.ownedCharacterData == null)
                 {
-                    SpeakText("No character data available");
+                    SpeakText(T("No character data available"));
                     return;
                 }
 
@@ -553,7 +555,7 @@ namespace FFVI_ScreenReader.Core
                 // Read HP/MP directly from character parameter
                 if (charData.parameter == null)
                 {
-                    SpeakText($"{characterName}, status information not available");
+                    SpeakText(string.Format(T("{0}, status information not available"), characterName));
                     return;
                 }
 
@@ -564,12 +566,12 @@ namespace FFVI_ScreenReader.Core
                 // Add HP
                 int currentHP = param.CurrentHP;
                 int maxHP = param.ConfirmedMaxHp();
-                statusParts.Add($"HP {currentHP} of {maxHP}");
+                statusParts.Add(string.Format(T("HP {0} of {1}"), currentHP, maxHP));
 
                 // Add MP
                 int currentMP = param.CurrentMP;
                 int maxMP = param.ConfirmedMaxMp();
-                statusParts.Add($"MP {currentMP} of {maxMP}");
+                statusParts.Add(string.Format(T("MP {0} of {1}"), currentMP, maxMP));
 
                 // Add status conditions
                 if (param.CurrentConditionList != null && param.CurrentConditionList.Count > 0)
@@ -598,7 +600,7 @@ namespace FFVI_ScreenReader.Core
 
                     if (conditionNames.Count > 0)
                     {
-                        statusParts.Add("Status: " + string.Join(", ", conditionNames));
+                        statusParts.Add(string.Format(T("Status: {0}"), string.Join(", ", conditionNames)));
                     }
                 }
 
@@ -608,7 +610,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing character status: {ex.Message}");
-                SpeakText("Error reading character status");
+                SpeakText(T("Error reading character status"));
             }
         }
 
@@ -620,19 +622,19 @@ namespace FFVI_ScreenReader.Core
 
                 if (userDataManager == null)
                 {
-                    SpeakText("User data not available");
+                    SpeakText(T("User data not available"));
                     return;
                 }
 
                 int gil = userDataManager.OwendGil;
-                string gilMessage = $"{gil:N0} gil";
+                string gilMessage = string.Format(T("{0} gil"), gil.ToString("N0"));
 
                 SpeakText(gilMessage);
             }
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing gil amount: {ex.Message}");
-                SpeakText("Error reading gil amount");
+                SpeakText(T("Error reading gil amount"));
             }
         }
 
@@ -646,7 +648,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing current map: {ex.Message}");
-                SpeakText("Error reading map name");
+                SpeakText(T("Error reading map name"));
             }
         }
 
@@ -690,7 +692,7 @@ namespace FFVI_ScreenReader.Core
                 var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                 if (fieldMap == null || fieldMap.fieldController == null)
                 {
-                    SpeakText("Airship status not available");
+                    SpeakText(T("Airship status not available"));
                     return;
                 }
 
@@ -713,7 +715,7 @@ namespace FFVI_ScreenReader.Core
 
                 if (airshipController == null || airshipController.fieldPlayer == null)
                 {
-                    SpeakText("Not on airship");
+                    SpeakText(T("Not on airship"));
                     return;
                 }
 
@@ -725,7 +727,7 @@ namespace FFVI_ScreenReader.Core
                 float normalizedRotation = ((rotationZ % 360) + 360) % 360;
                 // Mirror the rotation to match our E/W swapped compass directions
                 float mirroredRotation = (360 - normalizedRotation) % 360;
-                statusParts.Add($"Heading {mirroredRotation:F0} degrees");
+                statusParts.Add(string.Format(T("Heading {0} degrees"), mirroredRotation.ToString("F0")));
 
                 // Get current altitude
                 float altitudeRatio = fieldMap.fieldController.GetFlightAltitudeFieldOfViewRatio(true);
@@ -738,7 +740,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing airship status: {ex.Message}");
-                SpeakText("Error reading airship status");
+                SpeakText(T("Error reading airship status"));
             }
         }
 

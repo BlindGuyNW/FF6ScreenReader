@@ -8,6 +8,7 @@ using Il2CppLast.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Patches;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -93,11 +94,11 @@ namespace FFVI_ScreenReader.Menus
                 string announcement;
                 if (canEquipNames.Count == 0)
                 {
-                    announcement = "No characters can equip";
+                    announcement = T("No characters can equip");
                 }
                 else
                 {
-                    announcement = "Can equip: " + string.Join(", ", canEquipNames);
+                    announcement = string.Format(T("Can equip: {0}"), string.Join(", ", canEquipNames));
                 }
 
                 FFVI_ScreenReaderMod.SpeakText(announcement);

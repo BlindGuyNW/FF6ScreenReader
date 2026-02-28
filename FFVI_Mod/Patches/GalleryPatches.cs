@@ -8,6 +8,7 @@ using FFVI_ScreenReader.Menus;
 using FFVI_ScreenReader.Utils;
 using Il2CppLast.Management;
 using Il2CppLast.UI.KeyInput;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -64,7 +65,7 @@ namespace FFVI_ScreenReader.Patches
                         break;
 
                     case 2: // Details — image opened
-                        FFVI_ScreenReaderMod.SpeakText("Image open", true);
+                        FFVI_ScreenReaderMod.SpeakText(T("Image open"), true);
                         GalleryStateTracker.PreviousState = 2;
                         break;
 
@@ -82,7 +83,7 @@ namespace FFVI_ScreenReader.Patches
         private static IEnumerator AnnounceGalleryEntry()
         {
             yield return null;
-            FFVI_ScreenReaderMod.SpeakText("Gallery", true);
+            FFVI_ScreenReaderMod.SpeakText(T("Gallery"), true);
 
             float elapsed = 0f;
             while (elapsed < 2f)

@@ -16,6 +16,7 @@ using Il2CppLast.UI.Common;
 using LibraryInfoController_KeyInput = Il2CppLast.UI.KeyInput.LibraryInfoController;
 using LibraryMenuController_KeyInput = Il2CppLast.UI.KeyInput.LibraryMenuController;
 using LibraryMenuListController_KeyInput = Il2CppLast.UI.KeyInput.LibraryMenuListController;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -139,7 +140,7 @@ namespace FFVI_ScreenReader.Patches
                             if (previousState == 2 && !string.IsNullOrEmpty(BestiaryStateTracker.CachedEntryName))
                             {
                                 // Returning from full map — use cached data (MonsterData is stale)
-                                reannounce = $"Map closed. {BestiaryStateTracker.CachedEntryName}";
+                                reannounce = string.Format(T("Map closed. {0}"), BestiaryStateTracker.CachedEntryName);
                                 BestiaryStateTracker.CachedEntryName = null;
                                 BestiaryStateTracker.CachedHabitatNames = null;
                             }
@@ -172,7 +173,7 @@ namespace FFVI_ScreenReader.Patches
                                 BestiaryStateTracker.CachedHabitatNames = new List<string>();
                                 for (int i = 0; i < habitatList.Count; i++)
                                 {
-                                    string habitat = habitatList[i] ?? "Unknown location";
+                                    string habitat = habitatList[i] ?? T("Unknown location");
                                     if (habitat.Trim().Equals("Veldt", StringComparison.OrdinalIgnoreCase))
                                         continue;
                                     BestiaryStateTracker.CachedHabitatNames.Add(habitat);
@@ -271,13 +272,13 @@ namespace FFVI_ScreenReader.Patches
                 var cached = BestiaryStateTracker.CachedHabitatNames;
                 if (cached != null && cached.Count > 0)
                 {
-                    string announcement = $"Map open: {cached[0]}";
+                    string announcement = string.Format(T("Map open: {0}"), cached[0]);
                     AnnouncementDeduplicator.AnnounceIfNew(
                         AnnouncementContexts.BESTIARY_MAP, announcement);
                 }
                 else
                 {
-                    FFVI_ScreenReaderMod.SpeakText("Map open", true);
+                    FFVI_ScreenReaderMod.SpeakText(T("Map open"), true);
                 }
             }
             catch (Exception ex)
@@ -316,7 +317,7 @@ namespace FFVI_ScreenReader.Patches
             }
 
             // Timeout — announce generic fallback
-            FFVI_ScreenReaderMod.SpeakText("Formation view", true);
+            FFVI_ScreenReaderMod.SpeakText(T("Formation view"), true);
         }
 
         private static void ReadCurrentFormation(ArBattleTopController controller)
@@ -328,7 +329,7 @@ namespace FFVI_ScreenReader.Patches
 
                 if (partyList == null || partyList.Count == 0)
                 {
-                    FFVI_ScreenReaderMod.SpeakText("No formations available", true);
+                    FFVI_ScreenReaderMod.SpeakText(T("No formations available"), true);
                     return;
                 }
 
@@ -339,7 +340,7 @@ namespace FFVI_ScreenReader.Patches
                 string announcement = BestiaryReader.ReadFormation(partyIndex, party);
 
                 if (partyList.Count > 1)
-                    announcement += $" ({partyIndex + 1} of {partyList.Count})";
+                    announcement += string.Format(T(" ({0} of {1})"), partyIndex + 1, partyList.Count);
 
                 AnnouncementDeduplicator.AnnounceIfNew(
                     AnnouncementContexts.BESTIARY_FORMATION, announcement, true);
@@ -347,7 +348,7 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[Bestiary] Error reading formation data: {ex.Message}");
-                FFVI_ScreenReaderMod.SpeakText("Formation view", true);
+                FFVI_ScreenReaderMod.SpeakText(T("Formation view"), true);
             }
         }
 
@@ -492,8 +493,8 @@ namespace FFVI_ScreenReader.Patches
 
                 // Announce monster name
                 var pbData = data.pictureBookData;
-                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : "Unknown";
-                string announcement = $"{name}. Details";
+                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : T("Unknown");
+                string announcement = string.Format(T("{0}. Details"), name);
 
                 FFVI_ScreenReaderMod.SpeakText(announcement, true);
 
@@ -595,11 +596,11 @@ namespace FFVI_ScreenReader.Patches
 
                 var tracker = BestiaryNavigationTracker.Instance;
                 var data = tracker.CurrentMonsterData;
-                string name = "Unknown";
+                string name = T("Unknown");
                 if (data?.pictureBookData != null && data.pictureBookData.IsRelease)
                     name = data.pictureBookData.MonsterName;
 
-                FFVI_ScreenReaderMod.SpeakText($"{name}. Page changed", true);
+                FFVI_ScreenReaderMod.SpeakText(string.Format(T("{0}. Page changed"), name), true);
             }
             catch (Exception ex)
             {
@@ -642,8 +643,8 @@ namespace FFVI_ScreenReader.Patches
             try
             {
                 var pbData = data.pictureBookData;
-                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : "Unknown";
-                FFVI_ScreenReaderMod.SpeakText($"{name}. Details", true);
+                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : T("Unknown");
+                FFVI_ScreenReaderMod.SpeakText(string.Format(T("{0}. Details"), name), true);
 
                 LibraryInfoController_SetData_Patch.BuildAndInitializeStatBuffer();
             }
@@ -684,21 +685,21 @@ namespace FFVI_ScreenReader.Patches
                         if (tracker.CurrentMonsterData?.pictureBookData != null)
                             BestiaryStateTracker.CachedEntryName = BestiaryReader.ReadListEntry(tracker.CurrentMonsterData.pictureBookData);
 
-                        string mapInfo = "Minimap open";
+                        string mapInfo = T("Minimap open");
                         if (tracker.CurrentMonsterData != null)
                         {
                             string mapName = BestiaryReader.ReadMapName(tracker.CurrentMonsterData, currentMapIndex);
                             if (!string.IsNullOrEmpty(mapName))
-                                mapInfo = $"Minimap open: {mapName}";
+                                mapInfo = string.Format(T("Minimap open: {0}"), mapName);
                         }
                         FFVI_ScreenReaderMod.SpeakText(mapInfo, true);
                         lastMapIndex = currentMapIndex;
                     }
                     else if (currentState == 0) // MonsterList
                     {
-                        string closeMsg = "Minimap closed";
+                        string closeMsg = T("Minimap closed");
                         if (!string.IsNullOrEmpty(BestiaryStateTracker.CachedEntryName))
-                            closeMsg += $". {BestiaryStateTracker.CachedEntryName}";
+                            closeMsg += string.Format(T(". {0}"), BestiaryStateTracker.CachedEntryName);
                         BestiaryStateTracker.CachedEntryName = null;
                         FFVI_ScreenReaderMod.SpeakText(closeMsg, true);
                     }
@@ -946,8 +947,8 @@ namespace FFVI_ScreenReader.Patches
             try
             {
                 var pbData = data.pictureBookData;
-                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : "Unknown";
-                FFVI_ScreenReaderMod.SpeakText($"{name}. Details", true);
+                string name = pbData != null && pbData.IsRelease ? pbData.MonsterName : T("Unknown");
+                FFVI_ScreenReaderMod.SpeakText(string.Format(T("{0}. Details"), name), true);
 
                 LibraryInfoController_SetData_Patch.BuildAndInitializeStatBuffer();
             }

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -32,7 +33,7 @@ namespace FFVI_ScreenReader.Menus
             catch (Exception ex)
             {
                 MelonLoader.MelonLogger.Error($"Error in AnnounceKeyHelp: {ex.Message}");
-                FFVI_ScreenReaderMod.SpeakText("Error reading controls", interrupt: true);
+                FFVI_ScreenReaderMod.SpeakText(T("Error reading controls"), interrupt: true);
             }
         }
 
@@ -49,24 +50,24 @@ namespace FFVI_ScreenReader.Menus
                 controller = GameObjectCache.Refresh<KeyHelpController>();
 
             if (controller == null || controller.gameObject == null || !controller.gameObject.activeInHierarchy)
-                return "No controls displayed";
+                return T("No controls displayed");
 
             // Read private 'view' field (KeyHelpView) at offset 0x18 via unsafe pointer
             IntPtr controllerPtr = controller.Pointer;
             IntPtr viewPtr = *(IntPtr*)((byte*)controllerPtr.ToPointer() + OFFSET_VIEW);
             if (viewPtr == IntPtr.Zero)
-                return "No controls displayed";
+                return T("No controls displayed");
 
             var view = new KeyHelpView(viewPtr);
 
             // Get ContentsParent via public property
             var contentsParent = view.ContentsParent;
             if (contentsParent == null)
-                return "No controls displayed";
+                return T("No controls displayed");
 
             var contentsTransform = contentsParent.transform;
             if (contentsTransform == null || contentsTransform.childCount == 0)
-                return "No controls displayed";
+                return T("No controls displayed");
 
             var entries = new List<string>();
 
@@ -96,7 +97,7 @@ namespace FFVI_ScreenReader.Menus
             }
 
             if (entries.Count == 0)
-                return "No controls displayed";
+                return T("No controls displayed");
 
             return string.Join(", ", entries);
         }

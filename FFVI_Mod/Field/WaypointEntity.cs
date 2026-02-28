@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using FFVI_ScreenReader.Core;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Field
 {
@@ -73,15 +74,15 @@ namespace FFVI_ScreenReader.Field
             switch (category)
             {
                 case WaypointCategory.Docks:
-                    return "Dock";
+                    return T("Dock");
                 case WaypointCategory.Landmarks:
-                    return "Landmark";
+                    return T("Landmark");
                 case WaypointCategory.AirshipLandings:
-                    return "Airship Landing";
+                    return T("Airship Landing");
                 case WaypointCategory.Miscellaneous:
-                    return "Waypoint";
+                    return T("Waypoint");
                 default:
-                    return "Waypoint";
+                    return T("Waypoint");
             }
         }
 
@@ -90,7 +91,7 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public static string[] GetCategoryNames()
         {
-            return new string[] { "All", "Docks", "Landmarks", "Airship Landings", "Miscellaneous" };
+            return new string[] { T("All"), T("Docks"), T("Landmarks"), T("Airship Landings"), T("Miscellaneous") };
         }
     }
 }

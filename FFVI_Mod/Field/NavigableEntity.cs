@@ -199,34 +199,6 @@ namespace FFVI_ScreenReader.Field
             if (string.IsNullOrEmpty(assetName))
                 return null;
 
-            // Check P-codes for playable characters
-            var characterMap = new Dictionary<string, string>
-            {
-                { "P001", "Terra" },
-                { "P002", "Locke" },
-                { "P003", "Cyan" },
-                { "P004", "Shadow" },
-                { "P005", "Edgar" },
-                { "P006", "Sabin" },
-                { "P007", "Celes" },
-                { "P008", "Strago" },
-                { "P009", "Relm" },
-                { "P010", "Setzer" },
-                { "P011", "Mog" },
-                { "P012", "Gau" },
-                { "P013", "Gogo" },
-                { "P014", "Umaro" }
-            };
-
-            // Check if asset name contains a P-code
-            foreach (var kvp in characterMap)
-            {
-                if (assetName.Contains(kvp.Key))
-                {
-                    return kvp.Value;
-                }
-            }
-
             // Try NPC master data
             try
             {
@@ -328,9 +300,10 @@ namespace FFVI_ScreenReader.Field
         {
             if (!string.IsNullOrEmpty(DestinationName))
             {
-                // If Name contains Japanese characters, it's untranslated and redundant
-                // when we already have a localized destination name
-                if (Utils.EntityTranslator.ContainsJapaneseCharacters(Name))
+                // If Name contains Japanese characters and game isn't in Japanese,
+                // it's untranslated and redundant when we already have a localized destination name
+                if (Utils.EntityTranslator.DetectLanguage() != "ja" &&
+                    Utils.EntityTranslator.ContainsJapaneseCharacters(Name))
                     return DestinationName;
                 return $"{Name} → {DestinationName}";
             }

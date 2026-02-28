@@ -182,6 +182,10 @@ namespace FFVI_ScreenReader.Utils
             if (translations.Count == 0)
                 return japaneseName;
 
+            // When game is in Japanese, entity names are already Japanese — no translation needed
+            if (DetectLanguage() == "ja")
+                return japaneseName;
+
             bool shouldLog = translateLogCount < MAX_TRANSLATE_LOGS;
             if (shouldLog)
             {
@@ -333,7 +337,7 @@ namespace FFVI_ScreenReader.Utils
         /// Parses a two-level nested JSON dictionary: outerKey → (innerKey → value).
         /// Used for the embedded translation resource (jpName → {lang → translation}).
         /// </summary>
-        private static Dictionary<string, Dictionary<string, string>> ParseNestedJson(string json)
+        internal static Dictionary<string, Dictionary<string, string>> ParseNestedJson(string json)
         {
             var result = new Dictionary<string, Dictionary<string, string>>();
             if (string.IsNullOrEmpty(json)) return result;

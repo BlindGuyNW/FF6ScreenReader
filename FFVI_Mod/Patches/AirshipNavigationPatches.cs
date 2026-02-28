@@ -7,6 +7,7 @@ using Il2Cpp;
 using UnityEngine;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -55,7 +56,7 @@ namespace FFVI_ScreenReader.Patches
                             lastDirection = currentDirection;
                             MelonLogger.Msg($"[Airship] Facing: {currentDirection}");
                             bool recentLanding = (Time.time - MapUIManager_SwitchLandable_Patch.LastAnnouncementTime) < 0.5f;
-                            FFVI_ScreenReaderMod.SpeakText($"Facing {currentDirection}", interrupt: !recentLanding);
+                            FFVI_ScreenReaderMod.SpeakText(string.Format(T("Facing {0}"), currentDirection), interrupt: !recentLanding);
                         }
                     }
                 }
@@ -105,11 +106,11 @@ namespace FFVI_ScreenReader.Patches
 
                             if (currentIndex > lastIndex)
                             {
-                                changeDirection = "Rising. ";
+                                changeDirection = T("Rising. ");
                             }
                             else if (currentIndex < lastIndex)
                             {
-                                changeDirection = "Descending. ";
+                                changeDirection = T("Descending. ");
                             }
                         }
 

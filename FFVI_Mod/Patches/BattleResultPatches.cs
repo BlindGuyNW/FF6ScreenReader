@@ -13,6 +13,7 @@ using UnityEngine;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -59,14 +60,14 @@ namespace FFVI_ScreenReader.Patches
 
                 // Announce gil gained
                 int gil = data._GetGil_k__BackingField;
-                messageParts.Add($"{gil:N0} gil");
+                messageParts.Add(string.Format(T("{0} gil"), gil.ToString("N0")));
 
                 // Announce Magic AP (FF6 uses Mp field for Esper Magic AP, not Abp which is FF5's job system)
                 int magicAp = data._GetMp_k__BackingField;
                 MelonLogger.Msg($"[Battle Results] Magic AP value: {magicAp}");
                 if (magicAp > 0)
                 {
-                    messageParts.Add($"{magicAp} Magic AP");
+                    messageParts.Add(string.Format(T("{0} Magic AP"), magicAp));
                 }
 
                 // Announce items dropped
@@ -95,7 +96,7 @@ namespace FFVI_ScreenReader.Patches
                                     int quantity = itemContent.Count;
                                     if (quantity > 1)
                                     {
-                                        messageParts.Add($"{itemName} x{quantity}");
+                                        messageParts.Add(string.Format(T("{0} x{1}"), itemName, quantity));
                                     }
                                     else
                                     {
@@ -122,13 +123,13 @@ namespace FFVI_ScreenReader.Patches
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
-                        string progressAnnouncement = $"{charName} gained {charExp:N0} XP";
+                        string progressAnnouncement = string.Format(T("{0} gained {1} XP"), charName, charExp.ToString("N0"));
 
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            progressAnnouncement += $" and leveled up to level {newLevel}";
+                            progressAnnouncement += string.Format(T(" and leveled up to level {0}"), newLevel);
                         }
 
                         messageParts.Add(progressAnnouncement);
@@ -159,7 +160,7 @@ namespace FFVI_ScreenReader.Patches
                                         string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
                                         if (!string.IsNullOrWhiteSpace(abilityName))
                                         {
-                                            messageParts.Add($"{charName} learned {abilityName}");
+                                            messageParts.Add(string.Format(T("{0} learned {1}"), charName, abilityName));
                                         }
                                     }
                                 }
@@ -213,14 +214,14 @@ namespace FFVI_ScreenReader.Patches
 
                 // Announce gil gained
                 int gil = data._GetGil_k__BackingField;
-                messageParts.Add($"{gil:N0} gil");
+                messageParts.Add(string.Format(T("{0} gil"), gil.ToString("N0")));
 
                 // Announce Magic AP (FF6 uses Mp field for Esper Magic AP, not Abp which is FF5's job system)
                 int magicAp = data._GetMp_k__BackingField;
                 MelonLogger.Msg($"[Battle Results] Magic AP value: {magicAp}");
                 if (magicAp > 0)
                 {
-                    messageParts.Add($"{magicAp} Magic AP");
+                    messageParts.Add(string.Format(T("{0} Magic AP"), magicAp));
                 }
 
                 // Announce items dropped
@@ -249,7 +250,7 @@ namespace FFVI_ScreenReader.Patches
                                     int quantity = itemContent.Count;
                                     if (quantity > 1)
                                     {
-                                        messageParts.Add($"{itemName} x{quantity}");
+                                        messageParts.Add(string.Format(T("{0} x{1}"), itemName, quantity));
                                     }
                                     else
                                     {
@@ -276,13 +277,13 @@ namespace FFVI_ScreenReader.Patches
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
-                        string progressAnnouncement = $"{charName} gained {charExp:N0} XP";
+                        string progressAnnouncement = string.Format(T("{0} gained {1} XP"), charName, charExp.ToString("N0"));
 
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            progressAnnouncement += $" and leveled up to level {newLevel}";
+                            progressAnnouncement += string.Format(T(" and leveled up to level {0}"), newLevel);
                         }
 
                         messageParts.Add(progressAnnouncement);
@@ -313,7 +314,7 @@ namespace FFVI_ScreenReader.Patches
                                         string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
                                         if (!string.IsNullOrWhiteSpace(abilityName))
                                         {
-                                            messageParts.Add($"{charName} learned {abilityName}");
+                                            messageParts.Add(string.Format(T("{0} learned {1}"), charName, abilityName));
                                         }
                                     }
                                 }

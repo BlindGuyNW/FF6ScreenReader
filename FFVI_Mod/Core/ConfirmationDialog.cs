@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -49,15 +50,15 @@ namespace FFVI_ScreenReader.Core
             // Only steal focus if no blocker window exists (avoids destroy/recreate on chained dialogs)
             if (!WindowsFocusHelper.HasFocus)
             {
-                WindowsFocusHelper.StealFocus("FFVI_ConfirmDialog");
+                WindowsFocusHelper.StealFocus(T("Confirm"));
 
                 // Announce prompt with delay to avoid NVDA window title interruption
-                CoroutineManager.StartManaged(DelayedPromptAnnouncement($"{prompt} Yes or No"));
+                CoroutineManager.StartManaged(DelayedPromptAnnouncement(string.Format(T("{0} Yes or No"), prompt)));
             }
             else
             {
                 // Window already exists (chained dialog) — announce immediately
-                FFVI_ScreenReaderMod.SpeakText($"{prompt} Yes or No", interrupt: true);
+                FFVI_ScreenReaderMod.SpeakText(string.Format(T("{0} Yes or No"), prompt), interrupt: true);
             }
         }
 
@@ -122,7 +123,7 @@ namespace FFVI_ScreenReader.Core
             // Escape - cancel
             if (WindowsFocusHelper.IsKeyDown(WindowsFocusHelper.VK_ESCAPE))
             {
-                Resolve(false, "Cancelled");
+                Resolve(false, T("Cancelled"));
                 return true;
             }
 
@@ -131,11 +132,11 @@ namespace FFVI_ScreenReader.Core
             {
                 if (selectedYes)
                 {
-                    Resolve(true, "Yes");
+                    Resolve(true, T("Yes"));
                 }
                 else
                 {
-                    Resolve(false, "No");
+                    Resolve(false, T("No"));
                 }
                 return true;
             }
@@ -146,7 +147,7 @@ namespace FFVI_ScreenReader.Core
             if (leftPressed || rightPressed)
             {
                 selectedYes = !selectedYes;
-                string selection = selectedYes ? "Yes" : "No";
+                string selection = selectedYes ? T("Yes") : T("No");
                 FFVI_ScreenReaderMod.SpeakText(selection, interrupt: true);
                 return true;
             }

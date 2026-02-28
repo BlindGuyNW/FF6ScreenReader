@@ -5,6 +5,7 @@ using Il2CppLast.Data.User;
 using MelonLoader;
 using UnityEngine.UI;
 using FFVI_ScreenReader.Patches;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -90,7 +91,7 @@ namespace FFVI_ScreenReader.Menus
 
                 if (!string.IsNullOrWhiteSpace(level))
                 {
-                    parts.Add($"Level {level}");
+                    parts.Add(string.Format(T("Level {0}"), level));
                 }
             }
 
@@ -104,12 +105,12 @@ namespace FFVI_ScreenReader.Menus
 
                 if (!string.IsNullOrWhiteSpace(currentHp) && !string.IsNullOrWhiteSpace(maxHp))
                 {
-                    parts.Add($"HP: {currentHp} / {maxHp}");
+                    parts.Add(string.Format(T("HP: {0} / {1}"), currentHp, maxHp));
                 }
 
                 if (!string.IsNullOrWhiteSpace(currentMp) && !string.IsNullOrWhiteSpace(maxMp))
                 {
-                    parts.Add($"MP: {currentMp} / {maxMp}");
+                    parts.Add(string.Format(T("MP: {0} / {1}"), currentMp, maxMp));
                 }
             }
 
@@ -121,12 +122,12 @@ namespace FFVI_ScreenReader.Menus
 
                 if (!string.IsNullOrWhiteSpace(exp))
                 {
-                    parts.Add($"Experience: {exp}");
+                    parts.Add(string.Format(T("Experience: {0}"), exp));
                 }
 
                 if (!string.IsNullOrWhiteSpace(nextExp))
                 {
-                    parts.Add($"Next Level: {nextExp}");
+                    parts.Add(string.Format(T("Next Level: {0}"), nextExp));
                 }
             }
 
@@ -136,7 +137,7 @@ namespace FFVI_ScreenReader.Menus
                 var commandTexts = ReadBattleCommands(detailsView);
                 if (!string.IsNullOrWhiteSpace(commandTexts))
                 {
-                    parts.Add($"Commands: {commandTexts}");
+                    parts.Add(string.Format(T("Commands: {0}"), commandTexts));
                 }
             }
 
@@ -146,7 +147,7 @@ namespace FFVI_ScreenReader.Menus
                 string magicStone = GetTextSafe(detailsView.MagicalStoneText);
                 if (!string.IsNullOrWhiteSpace(magicStone) && magicStone.Trim() != "---")
                 {
-                    parts.Add($"Magicite: {magicStone}");
+                    parts.Add(string.Format(T("Magicite: {0}"), magicStone));
                 }
             }
 
@@ -156,7 +157,7 @@ namespace FFVI_ScreenReader.Menus
                 string levelUpBonus = GetTextSafe(detailsView.LevelUpBonusText);
                 if (!string.IsNullOrWhiteSpace(levelUpBonus) && levelUpBonus.Trim() != "---")
                 {
-                    parts.Add($"Bonus: {levelUpBonus}");
+                    parts.Add(string.Format(T("Bonus: {0}"), levelUpBonus));
                 }
             }
 
@@ -397,7 +398,7 @@ namespace FFVI_ScreenReader.Menus
             var tracker = StatusNavigationTracker.Instance;
             if (!tracker.ValidateState())
             {
-                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Navigation not available");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(T("Navigation not available"));
                 return;
             }
 
@@ -411,22 +412,22 @@ namespace FFVI_ScreenReader.Menus
 
             if (tracker.CurrentCharacterData == null)
             {
-                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("No character data");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(T("No character data"));
                 return;
             }
 
             try
             {
-                string groupName = (groupNum >= 0 && groupNum < GroupNames.Length) ? GroupNames[groupNum] : "";
+                string groupName = (groupNum >= 0 && groupNum < GroupNames.Length) ? T(GroupNames[groupNum]) : "";
                 var stat = statList[tracker.CurrentStatIndex];
                 string value = stat.Reader(tracker.CurrentCharacterData);
-                string announcement = string.IsNullOrEmpty(groupName) ? value : $"{groupName}: {value}";
+                string announcement = string.IsNullOrEmpty(groupName) ? value : string.Format(T("{0}: {1}"), groupName, value);
                 FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(announcement, true);
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error reading stat with group: {ex.Message}");
-                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Error reading stat");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(T("Error reading stat"));
             }
         }
 
@@ -444,7 +445,7 @@ namespace FFVI_ScreenReader.Menus
 
             if (tracker.CurrentCharacterData == null)
             {
-                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("No character data");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(T("No character data"));
                 return;
             }
 
@@ -457,7 +458,7 @@ namespace FFVI_ScreenReader.Menus
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error reading stat at index {index}: {ex.Message}");
-                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText("Error reading stat");
+                FFVI_ScreenReader.Core.FFVI_ScreenReaderMod.SpeakText(T("Error reading stat"));
             }
         }
 
@@ -489,12 +490,12 @@ namespace FFVI_ScreenReader.Menus
                     return name;
                 if (!string.IsNullOrEmpty(classTitle))
                     return classTitle;
-                return "N/A";
+                return T("N/A");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading name and class: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -541,14 +542,14 @@ namespace FFVI_ScreenReader.Menus
                 {
                     string level = StatusDetailsReader.GetTextSafe(statusView.CurrentLevelText);
                     if (!string.IsNullOrEmpty(level))
-                        return $"Level: {level}";
+                        return string.Format(T("Level: {0}"), level);
                 }
-                return "N/A";
+                return T("N/A");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading level: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -562,14 +563,14 @@ namespace FFVI_ScreenReader.Menus
                 {
                     string exp = StatusDetailsReader.GetTextSafe(detailsView.ExpText);
                     if (!string.IsNullOrEmpty(exp))
-                        return $"Experience: {exp}";
+                        return string.Format(T("Experience: {0}"), exp);
                 }
-                return "N/A";
+                return T("N/A");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading experience: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -583,14 +584,14 @@ namespace FFVI_ScreenReader.Menus
                 {
                     string nextExp = StatusDetailsReader.GetTextSafe(detailsView.NextExpText);
                     if (!string.IsNullOrEmpty(nextExp))
-                        return $"Next Level in: {nextExp}";
+                        return string.Format(T("Next Level in: {0}"), nextExp);
                 }
-                return "N/A";
+                return T("N/A");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading next level: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -598,15 +599,15 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
+                if (data?.parameter == null) return T("N/A");
                 int current = data.parameter.CurrentHP;
                 int max = data.parameter.ConfirmedMaxHp();
-                return $"HP: {current} / {max}";
+                return string.Format(T("HP: {0} / {1}"), current, max);
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading HP: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -614,15 +615,15 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
+                if (data?.parameter == null) return T("N/A");
                 int current = data.parameter.CurrentMP;
                 int max = data.parameter.ConfirmedMaxMp();
-                return $"MP: {current} / {max}";
+                return string.Format(T("MP: {0} / {1}"), current, max);
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading MP: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -630,13 +631,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Strength: {data.parameter.ConfirmedPower()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Strength: {0}"), data.parameter.ConfirmedPower());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Strength: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -644,13 +645,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Agility: {data.parameter.ConfirmedAgility()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Agility: {0}"), data.parameter.ConfirmedAgility());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Agility: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -658,13 +659,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Stamina: {data.parameter.ConfirmedVitality()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Stamina: {0}"), data.parameter.ConfirmedVitality());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Stamina: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -672,13 +673,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Magic: {data.parameter.ConfirmedMagic()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Magic: {0}"), data.parameter.ConfirmedMagic());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Magic: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -686,13 +687,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Attack: {data.parameter.ConfirmedAttack()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Attack: {0}"), data.parameter.ConfirmedAttack());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Attack: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -700,13 +701,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Defense: {data.parameter.ConfirmedDefense()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Defense: {0}"), data.parameter.ConfirmedDefense());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Defense: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -714,13 +715,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Evasion: {data.parameter.ConfirmedDefenseCount()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Evasion: {0}"), data.parameter.ConfirmedDefenseCount());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Evasion: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -728,13 +729,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Magic Defense: {data.parameter.ConfirmedAbilityDefense()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Magic Defense: {0}"), data.parameter.ConfirmedAbilityDefense());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Magic Defense: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -742,13 +743,13 @@ namespace FFVI_ScreenReader.Menus
         {
             try
             {
-                if (data?.parameter == null) return "N/A";
-                return $"Magic Evasion: {data.parameter.ConfirmedAbilityEvasionRate()}";
+                if (data?.parameter == null) return T("N/A");
+                return string.Format(T("Magic Evasion: {0}"), data.parameter.ConfirmedAbilityEvasionRate());
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading Magic Evasion: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -758,11 +759,11 @@ namespace FFVI_ScreenReader.Menus
             {
                 var tracker = StatusNavigationTracker.Instance;
                 var detailsView = tracker.ActiveController?.view;
-                if (detailsView == null) return "N/A";
+                if (detailsView == null) return T("N/A");
 
                 var commandList = detailsView.BattleCommandTextList;
                 if (commandList == null || commandList.Count == 0)
-                    return "Commands: none";
+                    return string.Format(T("Commands: {0}"), T("none"));
 
                 var commands = new List<string>();
                 for (int i = 0; i < commandList.Count; i++)
@@ -778,12 +779,12 @@ namespace FFVI_ScreenReader.Menus
                     }
                 }
 
-                return commands.Count > 0 ? $"Commands: {string.Join(", ", commands)}" : "Commands: none";
+                return commands.Count > 0 ? string.Format(T("Commands: {0}"), string.Join(", ", commands)) : string.Format(T("Commands: {0}"), T("none"));
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading commands: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -797,15 +798,15 @@ namespace FFVI_ScreenReader.Menus
                 {
                     string magicite = StatusDetailsReader.GetTextSafe(detailsView.MagicalStoneText);
                     if (!string.IsNullOrEmpty(magicite) && magicite.Trim() != "---")
-                        return $"Magicite: {magicite}";
-                    return "Magicite: none";
+                        return string.Format(T("Magicite: {0}"), magicite);
+                    return string.Format(T("Magicite: {0}"), T("none"));
                 }
-                return "Magicite: N/A";
+                return string.Format(T("Magicite: {0}"), T("N/A"));
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading magicite: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
 
@@ -819,15 +820,15 @@ namespace FFVI_ScreenReader.Menus
                 {
                     string bonus = StatusDetailsReader.GetTextSafe(detailsView.LevelUpBonusText);
                     if (!string.IsNullOrEmpty(bonus) && bonus.Trim() != "---")
-                        return $"At Level Up: {bonus}";
-                    return "At Level Up: none";
+                        return string.Format(T("At Level Up: {0}"), bonus);
+                    return string.Format(T("At Level Up: {0}"), T("none"));
                 }
-                return "At Level Up: N/A";
+                return string.Format(T("At Level Up: {0}"), T("N/A"));
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading level up bonus: {ex.Message}");
-                return "N/A";
+                return T("N/A");
             }
         }
     }

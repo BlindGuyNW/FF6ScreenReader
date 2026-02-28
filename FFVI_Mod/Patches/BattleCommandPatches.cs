@@ -8,9 +8,11 @@ using Il2CppLast.Data.Master;
 using Il2CppLast.Data.User;
 using Il2CppLast.Management;
 using Il2CppSerial.FF6.UI.KeyInput;
+using Il2CppSerial.Template.UI.KeyInput;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -360,6 +362,21 @@ namespace FFVI_ScreenReader.Patches
                 // Build announcement
                 string announcement = abilityName;
 
+                // Add MP cost from the content view's valueText
+                try
+                {
+                    var contentView = selectedContent.view;
+                    if (contentView != null)
+                    {
+                        var mpText = contentView.valueText;
+                        if (mpText != null && !string.IsNullOrWhiteSpace(mpText.text))
+                        {
+                            announcement += string.Format(T(", MP {0}"), mpText.text);
+                        }
+                    }
+                }
+                catch { /* MP text not available, continue without it */ }
+
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
@@ -384,6 +401,107 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in BattleQuantityAbilityInfomationController.SelectContent patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for summon ability selection in battle magic.
+    /// When a character has an esper equipped, the Magic command shows a "Summon" ability
+    /// at the top of the screen, separate from the scrollable spell list.
+    /// This patches SelectPhantomBeastContent to announce the summon ability name.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleQuantityAbilityInfomationController),
+        nameof(BattleQuantityAbilityInfomationController.SelectPhantomBeastContent),
+        new Type[] { typeof(Cursor) })]
+    public static class BattleQuantityAbilityInfomationController_SelectPhantomBeastContent_Patch
+    {
+        private static string lastAnnouncement = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(BattleQuantityAbilityInfomationController __instance, Cursor targetCursor)
+        {
+            try
+            {
+                if (__instance == null || targetCursor == null)
+                    return;
+
+                // Get the phantom beast content controller from the View
+                BattleAbilityInfomationContentController phantomBeastContent = null;
+                try
+                {
+                    var view = ((BattleAbilityInfomationControllerBase)__instance).View;
+                    if (view != null)
+                        phantomBeastContent = view.PhantomBeastContent;
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"[Battle Summon] View access failed: {ex.Message}");
+                }
+
+                if (phantomBeastContent == null)
+                    return;
+
+                // Read summon name from the displayed UI text (iconTextView.nameText)
+                // PhantomBeastContent.Data is null at runtime — the game only populates the UI text
+                string summonName = null;
+                try
+                {
+                    var iconText = phantomBeastContent.iconTextView;
+                    if (iconText != null && iconText.nameText != null)
+                        summonName = iconText.nameText.text;
+                }
+                catch { }
+
+                summonName = StripIconMarkup(summonName ?? "");
+                if (string.IsNullOrWhiteSpace(summonName))
+                    return;
+
+                // Read MP cost from the content view's valueText (same pattern as regular spells)
+                string mpCost = null;
+                try
+                {
+                    var contentView = phantomBeastContent.view;
+                    if (contentView != null && contentView.valueText != null)
+                    {
+                        string mpVal = contentView.valueText.text;
+                        if (!string.IsNullOrWhiteSpace(mpVal))
+                            mpCost = mpVal;
+                    }
+                }
+                catch { }
+
+                // Read description from the parent view's descriptionText
+                string description = null;
+                try
+                {
+                    var parentView = ((BattleAbilityInfomationControllerBase)__instance).View;
+                    if (parentView != null && parentView.descriptionText != null)
+                    {
+                        string desc = parentView.descriptionText.text;
+                        if (!string.IsNullOrWhiteSpace(desc))
+                            description = StripIconMarkup(desc);
+                    }
+                }
+                catch { }
+
+                // Build announcement: "Summon, Name, MP X, Description"
+                string announcement = string.Format(T("Summon, {0}"), summonName);
+                if (mpCost != null)
+                    announcement += string.Format(T(", MP {0}"), mpCost);
+                if (!string.IsNullOrWhiteSpace(description))
+                    announcement += $", {description}";
+
+                if (announcement == lastAnnouncement)
+                    return;
+                lastAnnouncement = announcement;
+
+                MelonLogger.Msg($"[Battle Summon] {announcement}");
+                FFVI_ScreenReaderMod.SpeakText(announcement);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in SelectPhantomBeastContent patch: {ex.Message}");
             }
         }
     }

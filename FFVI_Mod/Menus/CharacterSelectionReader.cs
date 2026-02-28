@@ -6,6 +6,7 @@ using Il2CppLast.UI;
 using MelonLoader;
 using UnityEngine;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Menus
 {
@@ -265,7 +266,7 @@ namespace FFVI_ScreenReader.Menus
                 // Add level
                 if (!string.IsNullOrEmpty(level))
                 {
-                    announcement += ", Level " + level;
+                    announcement += ", " + string.Format(T("Level {0}"), level);
                 }
 
                 // Add row information (Front Row / Back Row) - useful on all character screens
@@ -283,11 +284,11 @@ namespace FFVI_ScreenReader.Menus
                                 CorpsId corpsId = corps.Id;
                                 if (corpsId == CorpsId.Front)
                                 {
-                                    announcement += ", Front Row";
+                                    announcement += ", " + T("Front Row");
                                 }
                                 else if (corpsId == CorpsId.Back)
                                 {
-                                    announcement += ", Back Row";
+                                    announcement += ", " + T("Back Row");
                                 }
                             }
                         }
@@ -301,21 +302,21 @@ namespace FFVI_ScreenReader.Menus
                 // Add HP
                 if (!string.IsNullOrEmpty(currentHP) && !string.IsNullOrEmpty(maxHP))
                 {
-                    announcement += $", HP {currentHP}/{maxHP}";
+                    announcement += ", " + string.Format(T("HP {0}/{1}"), currentHP, maxHP);
                 }
                 else if (!string.IsNullOrEmpty(currentHP))
                 {
-                    announcement += $", HP {currentHP}";
+                    announcement += ", " + string.Format(T("HP {0}"), currentHP);
                 }
 
                 // Add MP
                 if (!string.IsNullOrEmpty(currentMP) && !string.IsNullOrEmpty(maxMP))
                 {
-                    announcement += $", MP {currentMP}/{maxMP}";
+                    announcement += ", " + string.Format(T("MP {0}/{1}"), currentMP, maxMP);
                 }
                 else if (!string.IsNullOrEmpty(currentMP))
                 {
-                    announcement += $", MP {currentMP}";
+                    announcement += ", " + string.Format(T("MP {0}"), currentMP);
                 }
 
                 if (!string.IsNullOrEmpty(announcement))

@@ -151,7 +151,8 @@ namespace FFVI_ScreenReader.Field
             {
                 if (!string.IsNullOrEmpty(exit.DestinationName))
                 {
-                    baseName = Utils.EntityTranslator.ContainsJapaneseCharacters(exit.Name)
+                    baseName = (Utils.EntityTranslator.DetectLanguage() != "ja" &&
+                               Utils.EntityTranslator.ContainsJapaneseCharacters(exit.Name))
                         ? exit.DestinationName
                         : $"{exit.Name} → {exit.DestinationName}";
                 }
