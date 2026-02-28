@@ -56,6 +56,11 @@ namespace FFVI_ScreenReader.Field
         public virtual bool IsInteractive => true;
 
         /// <summary>
+        /// Resolved display name for this entity (used for announcements)
+        /// </summary>
+        public string DisplayName => GetDisplayName();
+
+        /// <summary>
         /// Gets the display name for this entity (without distance/direction)
         /// </summary>
         protected abstract string GetDisplayName();

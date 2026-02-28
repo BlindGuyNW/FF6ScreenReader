@@ -514,12 +514,7 @@ namespace FFVI_ScreenReader.Core
 
             // Announce direction — use display-friendly name for the entity
             string direction = GetDirectionName(offset);
-            string entityLabel = entity.Name;
-            if (entity is Field.MapExitEntity exit && !string.IsNullOrEmpty(exit.DestinationName)
-                && Utils.EntityTranslator.ContainsJapaneseCharacters(entityLabel))
-            {
-                entityLabel = exit.DestinationName;
-            }
+            string entityLabel = entity.DisplayName;
             SpeakText($"Teleported {direction} of {entityLabel}");
             LoggerInstance.Msg($"Teleported {direction} of {entityLabel} to position {newPos}");
         }

@@ -452,7 +452,11 @@ namespace FFVI_ScreenReader.Core
 
         private void HandleItemInfoKey()
         {
-            // Try item menu equip check first
+            // Try esper details re-read first
+            if (Patches.MagicStoneDetailsController_Show_Patch.TryReannounceEsperDetails())
+                return;
+
+            // Try item menu equip check
             if (Menus.ItemEquipAnnouncer.TryAnnounceEquipRequirements())
                 return;
 

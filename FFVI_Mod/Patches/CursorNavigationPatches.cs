@@ -152,6 +152,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -339,6 +350,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
                     {
                         return;
                     }
@@ -538,6 +560,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -725,6 +758,17 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     if (parent.name.Contains("shop") || parent.name.Contains("Shop"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
                     {
                         return;
                     }

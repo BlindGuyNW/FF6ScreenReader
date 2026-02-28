@@ -663,6 +663,28 @@ namespace FFVI_ScreenReader.Patches
                     }
                 }
 
+                // Add MP cost from the list view
+                try
+                {
+                    var listView = __instance.view;
+                    if (listView != null && listView.mpValueText != null)
+                    {
+                        string mpCost = listView.mpValueText.text;
+                        if (!string.IsNullOrWhiteSpace(mpCost))
+                        {
+                            mpCost = StripIconMarkup(mpCost);
+                            if (!string.IsNullOrWhiteSpace(mpCost))
+                            {
+                                announcement += $", MP Cost {mpCost}";
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Error reading MP cost: {ex.Message}");
+                }
+
                 // Try to read additional information from the view hierarchy
                 // This may include stat bonuses, abilities learned, equip status, etc.
                 try
@@ -725,11 +747,36 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController), nameof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController.Show))]
     public static class MagicStoneDetailsController_Show_Patch
     {
-        private static string lastAnnouncement = "";
+        internal static string lastAnnouncement = "";
+        internal static string lastFullAnnouncement = "";
+        internal static Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController lastController = null;
 
-        private static Il2CppLast.Data.User.OwnedCharacterData lastTarget = null;
-        private static Il2CppSystem.Collections.Generic.List<Il2CppLast.Data.User.OwnedCharacterData> lastCandidates = null;
-        private static Il2CppSerial.FF6.UI.MagicStoneListData lastMagicStoneData = null;
+        internal static Il2CppLast.Data.User.OwnedCharacterData lastTarget = null;
+        internal static Il2CppSystem.Collections.Generic.List<Il2CppLast.Data.User.OwnedCharacterData> lastCandidates = null;
+        internal static Il2CppSerial.FF6.UI.MagicStoneListData lastMagicStoneData = null;
+
+        /// <summary>
+        /// Re-reads the last esper details if the details panel is still active.
+        /// Called by InputManager when 'i' is pressed.
+        /// </summary>
+        public static bool TryReannounceEsperDetails()
+        {
+            try
+            {
+                if (lastController == null || lastController.gameObject == null || !lastController.gameObject.activeInHierarchy)
+                    return false;
+
+                if (string.IsNullOrEmpty(lastFullAnnouncement))
+                    return false;
+
+                FFVI_ScreenReaderMod.SpeakText(lastFullAnnouncement);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         [HarmonyPostfix]
         public static void Postfix(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController __instance,
@@ -769,7 +816,7 @@ namespace FFVI_ScreenReader.Patches
             }
         }
 
-        private static System.Collections.IEnumerator ReadDetailsAfterDelay(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController controller)
+        internal static System.Collections.IEnumerator ReadDetailsAfterDelay(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController controller, bool announce = true)
         {
             // Wait one frame for the UI to update
             yield return null;
@@ -846,13 +893,14 @@ namespace FFVI_ScreenReader.Patches
                     for (int i = 0; i < contents.Count; i++)
                     {
                         var content = contents[i];
-                        if (content != null && content.view != null)
+                        if (content != null && content.gameObject.activeInHierarchy && content.view != null)
                         {
                             var contentView = content.view;
 
-                            // Try to get ability name and AP
+                            // Try to get ability name, progress, and AP rate
                             string abilityName = null;
                             string apCost = null;
+                            string progress = null;
 
                             if (contentView.magicNameText != null && contentView.magicNameText.nameText != null)
                             {
@@ -864,19 +912,45 @@ namespace FFVI_ScreenReader.Patches
                                 apCost = contentView.acquisitionRateText.text;
                             }
 
+                            // Check mastered status via star icon, then fall back to skill level text
+                            try
+                            {
+                                if (contentView.masterImage != null && contentView.masterImage.gameObject.activeInHierarchy)
+                                {
+                                    progress = "Mastered";
+                                }
+                                else if (contentView.skillLevelText != null)
+                                {
+                                    string levelText = contentView.skillLevelText.text;
+                                    if (!string.IsNullOrWhiteSpace(levelText))
+                                    {
+                                        progress = $"{levelText.Trim()}%";
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Progress not available, continue without it
+                            }
+
                             if (!string.IsNullOrWhiteSpace(abilityName))
                             {
                                 abilityName = StripIconMarkup(abilityName);
 
+                                string abilityEntry = abilityName;
+
+                                if (!string.IsNullOrWhiteSpace(progress))
+                                {
+                                    abilityEntry += $", {progress}";
+                                }
+
                                 if (!string.IsNullOrWhiteSpace(apCost))
                                 {
                                     apCost = StripIconMarkup(apCost);
-                                    abilities.Add($"{abilityName} {apCost}");
+                                    abilityEntry += $", {apCost}";
                                 }
-                                else
-                                {
-                                    abilities.Add(abilityName);
-                                }
+
+                                abilities.Add(abilityEntry);
                             }
                         }
                     }
@@ -922,8 +996,12 @@ namespace FFVI_ScreenReader.Patches
                 {
                     string announcement = string.Join(". ", details);
 
-                    // Skip duplicate announcements
-                    if (announcement != lastAnnouncement)
+                    // Store for re-read via 'i' key
+                    lastFullAnnouncement = announcement;
+                    lastController = controller;
+
+                    // Only speak if announce is true (silent rebuild for UpdateView)
+                    if (announce && announcement != lastAnnouncement)
                     {
                         lastAnnouncement = announcement;
                         MelonLogger.Msg($"[Esper Details] {announcement}");
@@ -938,6 +1016,53 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading esper details after delay: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for esper details UpdateView - called when navigating between espers while the details panel is open.
+    /// Updates stored data so the 'i' key re-read and auto-announcement reflect the new esper.
+    /// UpdateView is PRIVATE, so we must use string literal instead of nameof().
+    /// </summary>
+    [HarmonyPatch(typeof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController), "UpdateView",
+        new Type[] { typeof(Il2CppLast.Data.User.OwnedCharacterData), typeof(Il2CppSerial.FF6.UI.MagicStoneListData) })]
+    public static class MagicStoneDetailsController_UpdateView_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController __instance,
+                                    Il2CppLast.Data.User.OwnedCharacterData target,
+                                    Il2CppSerial.FF6.UI.MagicStoneListData magicStoneData)
+        {
+            try
+            {
+                MelonLogger.Msg("=== MagicStoneDetailsController.UpdateView CALLED ===");
+
+                if (__instance == null || magicStoneData == null)
+                {
+                    return;
+                }
+
+                // Update the stored parameters so 'i' key reads the current esper
+                MagicStoneDetailsController_Show_Patch.lastTarget = target;
+                MagicStoneDetailsController_Show_Patch.lastMagicStoneData = magicStoneData;
+
+                // Clear last announcement so the coroutine won't skip it as duplicate
+                MagicStoneDetailsController_Show_Patch.lastAnnouncement = "";
+
+                string esperName = magicStoneData.Name;
+                if (!string.IsNullOrWhiteSpace(esperName))
+                {
+                    esperName = StripIconMarkup(esperName);
+                    MelonLogger.Msg($"[Esper UpdateView] Navigated to: {esperName}");
+                }
+
+                // Re-run the details coroutine silently to rebuild lastFullAnnouncement for 'i' key
+                CoroutineManager.StartManaged(MagicStoneDetailsController_Show_Patch.ReadDetailsAfterDelay(__instance, announce: false));
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in MagicStoneDetailsController.UpdateView patch: {ex.Message}");
             }
         }
     }
