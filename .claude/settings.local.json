@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./build_and_deploy.bat)",
+      "Bash(find:*)",
+      "Bash(cmd.exe //c \"build_and_deploy.bat\")",
+      "Bash(\"D:/Games/Dev/Unity/FFPR/ff6/FF6ScreenReader/FFVI_Mod/build_and_deploy.bat\")",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)"
+    ],
+    "additionalDirectories": [
+      "D:\\Games\\Dev\\Unity\\FFPR\\ff5",
+      "D:\\Games\\steamlibrary\\steamapps\\common\\final fantasy vi PR"
+    ]
+  }
+}

@@ -66,8 +66,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\FF6UserData\translation.json" LogicalName="translation.json" />
-    <EmbeddedResource Include="..\FF6UserData\mod_text.json" LogicalName="mod_text.json" />
+    <EmbeddedResource Include="translation.json" LogicalName="translation.json" />
+    <EmbeddedResource Include="mod_text.json" LogicalName="mod_text.json" />
   </ItemGroup>
 
 </Project>
