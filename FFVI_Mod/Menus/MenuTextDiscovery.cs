@@ -121,6 +121,10 @@ namespace FFVI_ScreenReader.Menus
             menuText = TryReadFromKeysSettingController(cursor);
             if (menuText != null) return menuText;
 
+            // Strategy 4b: Language dropdown (must be before TryConfigCommandView which would return "Language" label)
+            menuText = TryReadLanguageDropdown(cursor);
+            if (menuText != null) return menuText;
+
             // Strategy 5: Title-style approach (cursor moves in hierarchy)
             menuText = TryDirectTextSearch(cursor.transform);
             if (menuText != null) return menuText;
@@ -209,6 +213,15 @@ namespace FFVI_ScreenReader.Menus
                 {
                     MelonLogger.Msg("Cursor is in dialog, skipping config controller");
                     return null;
+                }
+
+                // Skip if cursor is in language dropdown (cursor index maps to language items, not config items)
+                Transform langCheck = cursor.transform.parent;
+                while (langCheck != null)
+                {
+                    if (langCheck.name.Contains("language") || langCheck.name.Contains("Language"))
+                        return null;
+                    langCheck = langCheck.parent;
                 }
 
                 int cursorIndex = cursor.Index;
@@ -482,12 +495,98 @@ namespace FFVI_ScreenReader.Menus
         }
 
         /// <summary>
+        /// Strategy 4b: Language dropdown - reads the actual language name instead of the "Language" label.
+        /// </summary>
+        private static string TryReadLanguageDropdown(GameCursor cursor)
+        {
+            try
+            {
+                // Check if cursor is in language dropdown — also captures the language root
+                Transform languageRoot = null;
+                Transform parent = cursor.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        languageRoot = parent;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+                if (languageRoot == null) return null;
+
+                MelonLogger.Msg($"[LanguageDropdown] Cursor in language dropdown, index={cursor.Index}");
+
+                // Cursor is a standalone common_cursor(Clone) — NOT inside Content.
+                // Search DOWNWARD from languageRoot to find Content via existing helper.
+                Transform content = FindContentList(languageRoot);
+
+                if (content != null)
+                {
+                    // Count template/placeholder children at the start of Content
+                    // Unity Dropdown creates template items with "Option A" text
+                    int templateCount = 0;
+                    for (int i = 0; i < content.childCount; i++)
+                    {
+                        var child = content.GetChild(i);
+                        var text = child?.GetComponentInChildren<UnityEngine.UI.Text>();
+                        if (text != null)
+                        {
+                            string lower = text.text.ToLower().Trim();
+                            if (lower == "option a" || lower == "new text" || lower.StartsWith("menu_"))
+                            {
+                                templateCount++;
+                                continue;
+                            }
+                        }
+                        break; // Stop once we hit a non-template child
+                    }
+
+                    int adjustedIndex = cursor.Index + templateCount;
+                    MelonLogger.Msg($"[LanguageDropdown] Content children={content.childCount}, templates={templateCount}, adjustedIndex={adjustedIndex}");
+
+                    if (adjustedIndex >= 0 && adjustedIndex < content.childCount)
+                    {
+                        var item = content.GetChild(adjustedIndex);
+                        var text = item?.GetComponentInChildren<UnityEngine.UI.Text>();
+                        if (text != null && !string.IsNullOrWhiteSpace(text.text))
+                        {
+                            string langText = text.text.Trim();
+                            string lower = langText.ToLower();
+                            if (lower != "option a" && lower != "new text" && !lower.StartsWith("menu_"))
+                            {
+                                MelonLogger.Msg($"[LanguageDropdown] Found language: '{langText}'");
+                                return langText;
+                            }
+                        }
+                    }
+                }
+
+                MelonLogger.Msg("[LanguageDropdown] Could not find Content container via downward search");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Error in language dropdown read: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Strategy 3: Look for ConfigCommandView components (both Touch and KeyInput versions).
         /// </summary>
         private static string TryConfigCommandView(GameCursor cursor)
         {
             try
             {
+                // Skip if cursor is in language dropdown (would incorrectly return "Language" label)
+                Transform langCheck = cursor.transform.parent;
+                while (langCheck != null)
+                {
+                    if (langCheck.name.Contains("language") || langCheck.name.Contains("Language"))
+                        return null;
+                    langCheck = langCheck.parent;
+                }
+
                 Transform current = cursor.transform;
                 int hierarchyDepth = 0;
 

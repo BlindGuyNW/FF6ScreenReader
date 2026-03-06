@@ -8,9 +8,11 @@ using Il2CppLast.Data.User;
 using Il2CppLast.Management;
 using Il2CppSerial.FF6.UI.KeyInput;
 using Il2CppSerial.FF6.Management;
+using Il2CppSerial.Template.UI;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -189,7 +191,7 @@ namespace FFVI_ScreenReader.Patches
                             mpText = mpText.Trim();
                             if (mpText != "0" && mpText != "-")
                             {
-                                announcement += $", MP {mpText}";
+                                announcement += string.Format(T(", MP {0}"), mpText);
                             }
                         }
                     }
@@ -209,7 +211,7 @@ namespace FFVI_ScreenReader.Patches
                         int skillLevel = abilityData.SkillLevel;
                         if (skillLevel < 100 && skillLevel > 0)
                         {
-                            announcement += $", learning, {skillLevel} percent";
+                            announcement += string.Format(T(", learning, {0} percent"), skillLevel);
                         }
                         // If SkillLevel == 100, don't announce learning progress (already mastered)
                         // If SkillLevel == 0, the ability hasn't started learning yet
@@ -227,7 +229,7 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
                 }
 
@@ -258,6 +260,31 @@ namespace FFVI_ScreenReader.Patches
     public static class SpecialAbilityContentListController_SelectContent_AbilityMenu_Patch
     {
         private static string lastAnnouncement = "";
+
+        /// <summary>
+        /// Stores the MesIdName of the currently selected special ability (Blitz/Tool)
+        /// so the I key can look up Blitz input sequences.
+        /// </summary>
+        public static string CurrentMesIdName { get; private set; }
+
+        /// <summary>
+        /// Attempts to announce the Blitz input sequence for the currently selected ability.
+        /// Returns true if a Blitz sequence was found and spoken.
+        /// </summary>
+        public static bool TryAnnounceBlitzSequence()
+        {
+            if (string.IsNullOrEmpty(CurrentMesIdName))
+                return false;
+
+            if (BlitzData.TryGetBlitzSequence(CurrentMesIdName, out string sequence))
+            {
+                MelonLogger.Msg($"[Blitz Input] {sequence}");
+                FFVI_ScreenReaderMod.SpeakText(sequence);
+                return true;
+            }
+
+            return false;
+        }
 
         [HarmonyPostfix]
         public static void Postfix(SpecialAbilityContentListController __instance, Cursor targetCursor)
@@ -305,6 +332,9 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Track the currently selected ability for Blitz input lookup
+                CurrentMesIdName = mesIdName;
+
                 var messageManager = MessageManager.Instance;
                 if (messageManager == null)
                 {
@@ -336,6 +366,10 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(abilityName + ":"))
+                            description = description.Substring(abilityName.Length + 1).TrimStart();
+
                         announcement += $". {description}";
                     }
                 }
@@ -347,7 +381,7 @@ namespace FFVI_ScreenReader.Patches
                 }
                 lastAnnouncement = announcement;
 
-                MelonLogger.Msg($"[Special Ability] {announcement}");
+                MelonLogger.Msg($"[Special Ability] MesIdName={mesIdName}, {announcement}");
                 FFVI_ScreenReaderMod.SpeakText(announcement);
             }
             catch (Exception ex)
@@ -358,8 +392,9 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch for ability equipping/changing content selection.
-    /// Announces ability slots and currently equipped abilities.
+    /// Patch for ability equipping/changing content selection (Gogo's ability scroll list).
+    /// Reads from allEquips[] (all available commands) which backs the scroll view,
+    /// NOT from view.CurrentList (which only has the 4 command slots).
     /// </summary>
     [HarmonyPatch(typeof(AbilityChangeController), nameof(AbilityChangeController.SelectContent))]
     public static class AbilityChangeController_SelectContent_Patch
@@ -376,95 +411,55 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // Get the view
-                var view = __instance.view;
-                if (view == null)
+                // Access allEquips from the base class (StatusDetailsCommandChangeBaseController)
+                // This is the full list of available commands for the scroll view.
+                // In Il2Cpp, protected fields are exposed on the generated wrapper.
+                var allEquips = __instance.allEquips;
+                if (allEquips == null || index < 0 || index >= allEquips.Length)
                 {
                     return;
                 }
 
-                // Get the current list (the content list)
-                var contentList = view.CurrentList;
-                if (contentList == null || contentList.Count == 0)
+                var equipData = allEquips[index];
+                if (equipData == null)
                 {
                     return;
                 }
 
-                // Validate index
-                if (index < 0 || index >= contentList.Count)
+                // Get command name from the data model via MessageManager
+                if (string.IsNullOrWhiteSpace(equipData.NameMessageId))
                 {
                     return;
                 }
 
-                // Get the content controller at the index
-                var content = contentList[index];
-                if (content == null)
+                var messageManager = MessageManager.Instance;
+                if (messageManager == null)
                 {
                     return;
                 }
 
-                // Get the content view
-                var contentView = content.view;
-                if (contentView == null)
+                string commandName = StripIconMarkup(messageManager.GetMessage(equipData.NameMessageId));
+                if (string.IsNullOrWhiteSpace(commandName))
                 {
                     return;
                 }
 
-                // Build announcement from available text components
-                string announcement = "";
+                string announcement = commandName;
 
-                // Try to get the ability name from the IconText view
-                try
+                // Indicate if this command is already equipped in one of the 4 slots
+                if (equipData.IsEquiped)
                 {
-                    var iconText = contentView.IconText;
-                    if (iconText != null && iconText.nameText != null && !string.IsNullOrWhiteSpace(iconText.nameText.text))
+                    announcement += T(", equipped");
+                }
+
+                // Add description if available
+                if (!string.IsNullOrWhiteSpace(equipData.DescriptionMessageId))
+                {
+                    string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
+                    if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement = iconText.nameText.text.Trim();
+                        announcement += string.Format(T(". {0}"), description);
                     }
-                }
-                catch
-                {
-                    // Name text not available
-                }
-
-                // If we still don't have text, try to search the hierarchy
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    try
-                    {
-                        if (contentView.transform != null)
-                        {
-                            // Use non-allocating search for first valid text
-                            var foundText = FindFirstText(contentView.transform, t =>
-                                t.gameObject.activeInHierarchy &&
-                                !string.IsNullOrWhiteSpace(t.text) &&
-                                t.text.Trim().ToLower() != "new text" &&
-                                !t.text.Trim().StartsWith("menu_"),
-                                includeInactive: false);
-
-                            if (foundText != null)
-                            {
-                                announcement = foundText.text.Trim();
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Could not get text
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    return;
-                }
-
-                // Remove icon markup
-                announcement = StripIconMarkup(announcement);
-
-                if (string.IsNullOrWhiteSpace(announcement))
-                {
-                    return;
                 }
 
                 // Skip duplicate announcements
@@ -485,8 +480,9 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch for command selection in the ability change menu.
-    /// Announces which command is being modified.
+    /// Patch for command slot selection in Gogo's ability change menu.
+    /// Reads from view.CurrentList[index].TargetData (AbilityEquipData) to get
+    /// the command name, fixed status, and description for each of the 4 slots.
     /// </summary>
     [HarmonyPatch(typeof(AbilityChangeController), nameof(AbilityChangeController.SelectCommand))]
     public static class AbilityChangeController_SelectCommand_Patch
@@ -503,48 +499,80 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
-                // Access command names through the state machine base controller's data
-                // The AbilityChangeController has access to character and command data
-                // For now, we'll use a simpler approach - just read from the view hierarchy
+                var view = __instance.view;
+                if (view == null)
+                {
+                    return;
+                }
 
-                string announcement = "";
+                // CurrentList contains the 4 command slot controllers (AbilityChangeContentController)
+                // each with a TargetData property holding AbilityEquipData
+                var currentList = view.CurrentList;
+                if (currentList == null || currentList.Count == 0)
+                {
+                    return;
+                }
 
-                // Try to read directly from the view's transform hierarchy
+                if (index < 0 || index >= currentList.Count)
+                {
+                    return;
+                }
+
+                int slotNumber = index + 1;
+                var content = currentList[index];
+
+                // Check if the slot has data
+                AbilityEquipData equipData = null;
                 try
                 {
-                    var view = __instance.view;
-                    if (view != null && view.transform != null)
+                    if (content != null)
                     {
-                        // Use non-allocating search for first valid text
-                        var foundText = FindFirstText(view.transform, t =>
-                            t.gameObject.activeInHierarchy &&
-                            !string.IsNullOrWhiteSpace(t.text) &&
-                            t.text.Trim().ToLower() != "new text" &&
-                            !t.text.Trim().StartsWith("menu_"),
-                            includeInactive: false);
-
-                        if (foundText != null)
-                        {
-                            announcement = foundText.text.Trim();
-                        }
+                        equipData = content.TargetData;
                     }
                 }
                 catch
                 {
-                    // Could not get text
+                    // TargetData access failed
                 }
 
-                if (string.IsNullOrWhiteSpace(announcement))
+                string announcement;
+
+                if (equipData == null || string.IsNullOrWhiteSpace(equipData.NameMessageId))
                 {
-                    return;
+                    announcement = string.Format(T("Slot {0}: Empty"), slotNumber);
                 }
-
-                // Remove icon markup
-                announcement = StripIconMarkup(announcement);
-
-                if (string.IsNullOrWhiteSpace(announcement))
+                else
                 {
-                    return;
+                    var messageManager = MessageManager.Instance;
+                    if (messageManager == null)
+                    {
+                        return;
+                    }
+
+                    string commandName = StripIconMarkup(messageManager.GetMessage(equipData.NameMessageId));
+                    if (string.IsNullOrWhiteSpace(commandName))
+                    {
+                        announcement = string.Format(T("Slot {0}: Empty"), slotNumber);
+                    }
+                    else
+                    {
+                        announcement = string.Format(T("Slot {0}: {1}"), slotNumber, commandName);
+
+                        if (equipData.IsFixed)
+                        {
+                            announcement += T(", fixed");
+                        }
+
+                        // Add description if available
+                        if (!string.IsNullOrWhiteSpace(equipData.DescriptionMessageId))
+                        {
+                            string description = StripIconMarkup(messageManager.GetMessage(equipData.DescriptionMessageId));
+                            if (!string.IsNullOrWhiteSpace(description))
+                            {
+                                announcement += string.Format(T(". {0}"), description);
+                            }
+                        }
+                    }
                 }
 
                 // Skip duplicate announcements
@@ -632,7 +660,7 @@ namespace FFVI_ScreenReader.Patches
                 bool isOwned = magicStoneData.IsOwned;
                 if (!isOwned)
                 {
-                    announcement += " - NOT OBTAINED";
+                    announcement += T(" - NOT OBTAINED");
                 }
                 else
                 {
@@ -647,7 +675,7 @@ namespace FFVI_ScreenReader.Patches
 
                             if (equippedEsperId == thisEsperId && equippedEsperId > 0)
                             {
-                                announcement += " - EQUIPPED";
+                                announcement += T(" - EQUIPPED");
                             }
                         }
                     }
@@ -664,8 +692,30 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
-                        announcement += $". {description}";
+                        announcement += string.Format(T(". {0}"), description);
                     }
+                }
+
+                // Add MP cost from the list view
+                try
+                {
+                    var listView = __instance.view;
+                    if (listView != null && listView.mpValueText != null)
+                    {
+                        string mpCost = listView.mpValueText.text;
+                        if (!string.IsNullOrWhiteSpace(mpCost))
+                        {
+                            mpCost = StripIconMarkup(mpCost);
+                            if (!string.IsNullOrWhiteSpace(mpCost) && mpCost.Trim() != "0")
+                            {
+                                announcement += string.Format(T(", MP Cost {0}"), mpCost);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"Error reading MP cost: {ex.Message}");
                 }
 
                 // Try to read additional information from the view hierarchy
@@ -730,11 +780,36 @@ namespace FFVI_ScreenReader.Patches
     [HarmonyPatch(typeof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController), nameof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController.Show))]
     public static class MagicStoneDetailsController_Show_Patch
     {
-        private static string lastAnnouncement = "";
+        internal static string lastAnnouncement = "";
+        internal static string lastFullAnnouncement = "";
+        internal static Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController lastController = null;
 
-        private static Il2CppLast.Data.User.OwnedCharacterData lastTarget = null;
-        private static Il2CppSystem.Collections.Generic.List<Il2CppLast.Data.User.OwnedCharacterData> lastCandidates = null;
-        private static Il2CppSerial.FF6.UI.MagicStoneListData lastMagicStoneData = null;
+        internal static Il2CppLast.Data.User.OwnedCharacterData lastTarget = null;
+        internal static Il2CppSystem.Collections.Generic.List<Il2CppLast.Data.User.OwnedCharacterData> lastCandidates = null;
+        internal static Il2CppSerial.FF6.UI.MagicStoneListData lastMagicStoneData = null;
+
+        /// <summary>
+        /// Re-reads the last esper details if the details panel is still active.
+        /// Called by InputManager when 'i' is pressed.
+        /// </summary>
+        public static bool TryReannounceEsperDetails()
+        {
+            try
+            {
+                if (lastController == null || lastController.gameObject == null || !lastController.gameObject.activeInHierarchy)
+                    return false;
+
+                if (string.IsNullOrEmpty(lastFullAnnouncement))
+                    return false;
+
+                FFVI_ScreenReaderMod.SpeakText(lastFullAnnouncement);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         [HarmonyPostfix]
         public static void Postfix(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController __instance,
@@ -774,7 +849,7 @@ namespace FFVI_ScreenReader.Patches
             }
         }
 
-        private static System.Collections.IEnumerator ReadDetailsAfterDelay(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController controller)
+        internal static System.Collections.IEnumerator ReadDetailsAfterDelay(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController controller, bool announce = true)
         {
             // Wait one frame for the UI to update
             yield return null;
@@ -797,7 +872,7 @@ namespace FFVI_ScreenReader.Patches
                 System.Collections.Generic.List<string> details = new System.Collections.Generic.List<string>();
 
                 // Check equipped status FIRST - find which character has this esper
-                string equippedStatus = "Not equipped";
+                string equippedStatus = T("Not equipped");
 
                 if (lastMagicStoneData != null && lastCandidates != null)
                 {
@@ -814,7 +889,7 @@ namespace FFVI_ScreenReader.Patches
 
                             if (string.IsNullOrWhiteSpace(characterName))
                             {
-                                characterName = "Unknown";
+                                characterName = T("Unknown");
                             }
                             else
                             {
@@ -825,11 +900,11 @@ namespace FFVI_ScreenReader.Patches
                             // Check if it's the currently selected character
                             if (lastTarget != null && character.Id == lastTarget.Id)
                             {
-                                equippedStatus = $"EQUIPPED to {characterName}";
+                                equippedStatus = string.Format(T("EQUIPPED to {0}"), characterName);
                             }
                             else
                             {
-                                equippedStatus = $"Equipped to {characterName}";
+                                equippedStatus = string.Format(T("Equipped to {0}"), characterName);
                             }
 
                             MelonLogger.Msg($"[Esper Show] Equipped to: {characterName}");
@@ -851,13 +926,14 @@ namespace FFVI_ScreenReader.Patches
                     for (int i = 0; i < contents.Count; i++)
                     {
                         var content = contents[i];
-                        if (content != null && content.view != null)
+                        if (content != null && content.gameObject.activeInHierarchy && content.view != null)
                         {
                             var contentView = content.view;
 
-                            // Try to get ability name and AP
+                            // Try to get ability name, progress, and AP rate
                             string abilityName = null;
                             string apCost = null;
+                            string progress = null;
 
                             if (contentView.magicNameText != null && contentView.magicNameText.nameText != null)
                             {
@@ -869,19 +945,45 @@ namespace FFVI_ScreenReader.Patches
                                 apCost = contentView.acquisitionRateText.text;
                             }
 
+                            // Check mastered status via star icon, then fall back to skill level text
+                            try
+                            {
+                                if (contentView.masterImage != null && contentView.masterImage.gameObject.activeInHierarchy)
+                                {
+                                    progress = T("Mastered");
+                                }
+                                else if (contentView.skillLevelText != null)
+                                {
+                                    string levelText = contentView.skillLevelText.text;
+                                    if (!string.IsNullOrWhiteSpace(levelText))
+                                    {
+                                        progress = string.Format(T("{0}%"), levelText.Trim());
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Progress not available, continue without it
+                            }
+
                             if (!string.IsNullOrWhiteSpace(abilityName))
                             {
                                 abilityName = StripIconMarkup(abilityName);
 
+                                string abilityEntry = abilityName;
+
+                                if (!string.IsNullOrWhiteSpace(progress))
+                                {
+                                    abilityEntry += string.Format(T(", {0}"), progress);
+                                }
+
                                 if (!string.IsNullOrWhiteSpace(apCost))
                                 {
                                     apCost = StripIconMarkup(apCost);
-                                    abilities.Add($"{abilityName} {apCost}");
+                                    abilityEntry += string.Format(T(", {0}"), apCost);
                                 }
-                                else
-                                {
-                                    abilities.Add(abilityName);
-                                }
+
+                                abilities.Add(abilityEntry);
                             }
                         }
                     }
@@ -889,7 +991,7 @@ namespace FFVI_ScreenReader.Patches
                     if (abilities.Count > 0)
                     {
                         // Announce all abilities with their AP costs
-                        details.Add($"Teaches {abilities.Count} abilities: " + string.Join(", ", abilities));
+                        details.Add(string.Format(T("Teaches {0} abilities: "), abilities.Count) + string.Join(", ", abilities));
                     }
                 }
                 else
@@ -913,7 +1015,7 @@ namespace FFVI_ScreenReader.Patches
 
                         if (!string.IsNullOrWhiteSpace(statBonus))
                         {
-                            details.Add($"Level up bonus: {statBonus}");
+                            details.Add(string.Format(T("Level up bonus: {0}"), statBonus));
                         }
                     }
                 }
@@ -927,8 +1029,12 @@ namespace FFVI_ScreenReader.Patches
                 {
                     string announcement = string.Join(". ", details);
 
-                    // Skip duplicate announcements
-                    if (announcement != lastAnnouncement)
+                    // Store for re-read via 'i' key
+                    lastFullAnnouncement = announcement;
+                    lastController = controller;
+
+                    // Only speak if announce is true (silent rebuild for UpdateView)
+                    if (announce && announcement != lastAnnouncement)
                     {
                         lastAnnouncement = announcement;
                         MelonLogger.Msg($"[Esper Details] {announcement}");
@@ -943,6 +1049,53 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error reading esper details after delay: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for esper details UpdateView - called when navigating between espers while the details panel is open.
+    /// Updates stored data so the 'i' key re-read and auto-announcement reflect the new esper.
+    /// UpdateView is PRIVATE, so we must use string literal instead of nameof().
+    /// </summary>
+    [HarmonyPatch(typeof(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController), "UpdateView",
+        new Type[] { typeof(Il2CppLast.Data.User.OwnedCharacterData), typeof(Il2CppSerial.FF6.UI.MagicStoneListData) })]
+    public static class MagicStoneDetailsController_UpdateView_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(Il2CppSerial.FF6.UI.KeyInput.MagicStoneDetailsController __instance,
+                                    Il2CppLast.Data.User.OwnedCharacterData target,
+                                    Il2CppSerial.FF6.UI.MagicStoneListData magicStoneData)
+        {
+            try
+            {
+                MelonLogger.Msg("=== MagicStoneDetailsController.UpdateView CALLED ===");
+
+                if (__instance == null || magicStoneData == null)
+                {
+                    return;
+                }
+
+                // Update the stored parameters so 'i' key reads the current esper
+                MagicStoneDetailsController_Show_Patch.lastTarget = target;
+                MagicStoneDetailsController_Show_Patch.lastMagicStoneData = magicStoneData;
+
+                // Clear last announcement so the coroutine won't skip it as duplicate
+                MagicStoneDetailsController_Show_Patch.lastAnnouncement = "";
+
+                string esperName = magicStoneData.Name;
+                if (!string.IsNullOrWhiteSpace(esperName))
+                {
+                    esperName = StripIconMarkup(esperName);
+                    MelonLogger.Msg($"[Esper UpdateView] Navigated to: {esperName}");
+                }
+
+                // Re-run the details coroutine silently to rebuild lastFullAnnouncement for 'i' key
+                CoroutineManager.StartManaged(MagicStoneDetailsController_Show_Patch.ReadDetailsAfterDelay(__instance, announce: false));
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in MagicStoneDetailsController.UpdateView patch: {ex.Message}");
             }
         }
     }
@@ -1007,7 +1160,7 @@ namespace FFVI_ScreenReader.Patches
                         int currentMP = parameter.CurrentMP;
                         int maxMP = parameter.ConfirmedMaxMp();
 
-                        announcement += $", HP {currentHP}/{maxHP}, MP {currentMP}/{maxMP}";
+                        announcement += string.Format(T(", HP {0}/{1}, MP {2}/{3}"), currentHP, maxHP, currentMP, maxMP);
 
                         // Get status conditions
                         var conditionList = parameter.ConfirmedConditionList();
@@ -1038,7 +1191,7 @@ namespace FFVI_ScreenReader.Patches
 
                                 if (statusNames.Count > 0)
                                 {
-                                    announcement += $", {string.Join(", ", statusNames)}";
+                                    announcement += string.Format(T(", {0}"), string.Join(", ", statusNames));
                                 }
                             }
                         }

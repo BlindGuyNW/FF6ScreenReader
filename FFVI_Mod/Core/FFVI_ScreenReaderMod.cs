@@ -4,6 +4,7 @@ using FFVI_ScreenReader.Field;
 using UnityEngine;
 using Il2Cpp;
 using Il2CppLast.Map;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 [assembly: MelonInfo(typeof(FFVI_ScreenReader.Core.FFVI_ScreenReaderMod), "FFVI Screen Reader", "1.0.0", "Zachary Kline")]
 [assembly: MelonGame("SQUARE ENIX, Inc.", "FINAL FANTASY VI")]
@@ -30,12 +31,16 @@ namespace FFVI_ScreenReader.Core
     /// </summary>
     public class FFVI_ScreenReaderMod : MelonMod
     {
+        internal static FFVI_ScreenReaderMod Instance { get; private set; }
+
         private static TolkWrapper tolk;
         private InputManager inputManager;
         private EntityCache entityCache;
         private EntityNavigator entityNavigator;
         private WaypointManager waypointManager;
         private WaypointNavigator waypointNavigator;
+        private WaypointController waypointController;
+        private AudioLoopManager audioLoopManager;
 
         // Entity scanning
         private const float ENTITY_SCAN_INTERVAL = 5f;
@@ -49,29 +54,30 @@ namespace FFVI_ScreenReader.Core
         // Map exit filter toggle
         private bool filterMapExits = false;
 
+        // Layer transition filter toggle
+        private bool filterToLayer = false;
+
         // Map transition tracking
         private int lastAnnouncedMapId = -1;
 
-        // Preferences
-        private static MelonPreferences_Category prefsCategory;
-        private static MelonPreferences_Entry<bool> prefPathfindingFilter;
-        private static MelonPreferences_Entry<bool> prefMapExitFilter;
-
         public override void OnInitializeMelon()
         {
+            Instance = this;
             LoggerInstance.Msg("FFVI Screen Reader Mod loaded!");
 
             // Subscribe to scene load events for automatic component caching
             UnityEngine.SceneManagement.SceneManager.sceneLoaded += (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
 
-            // Initialize preferences
-            prefsCategory = MelonPreferences.CreateCategory("FFVI_ScreenReader");
-            prefPathfindingFilter = prefsCategory.CreateEntry<bool>("PathfindingFilter", false, "Pathfinding Filter", "Only show entities with valid paths when cycling");
-            prefMapExitFilter = prefsCategory.CreateEntry<bool>("MapExitFilter", false, "Map Exit Filter", "Filter multiple map exits to the same destination, showing only the closest one");
+            // Initialize centralized preferences and mod menu
+            PreferencesManager.Initialize();
+            ModMenu.Initialize();
+            Utils.EntityTranslator.Initialize();
+            Utils.ModTextTranslator.Initialize();
 
             // Load saved preferences
-            filterByPathfinding = prefPathfindingFilter.Value;
-            filterMapExits = prefMapExitFilter.Value;
+            filterByPathfinding = PreferencesManager.PathfindingFilterDefault;
+            filterMapExits = PreferencesManager.MapExitFilterDefault;
+            filterToLayer = PreferencesManager.ToLayerFilterDefault;
 
             // Initialize Tolk for screen reader support
             tolk = new TolkWrapper();
@@ -83,10 +89,23 @@ namespace FFVI_ScreenReader.Core
             entityNavigator = new EntityNavigator(entityCache);
             entityNavigator.FilterByPathfinding = filterByPathfinding;
             entityNavigator.FilterMapExits = filterMapExits;
+            entityNavigator.FilterToLayer = filterToLayer;
 
-            // Initialize waypoint manager and navigator
+            // Initialize waypoint manager, navigator, and controller
             waypointManager = new WaypointManager();
             waypointNavigator = new WaypointNavigator(waypointManager);
+            waypointController = new WaypointController(waypointManager, waypointNavigator);
+
+            // Apply manual Harmony patches (for types that need runtime patching)
+            var harmony = new HarmonyLib.Harmony("FFVI_ScreenReader.ManualPatches");
+            Patches.PopupPatches.ApplyPatches(harmony);
+
+            // Initialize external sound system
+            Utils.SoundPlayer.Initialize();
+
+            // Initialize audio loop manager
+            audioLoopManager = new AudioLoopManager(entityCache, entityNavigator);
+            audioLoopManager.InitializeFromPreferences();
 
             // Initialize input manager
             inputManager = new InputManager(this);
@@ -97,6 +116,8 @@ namespace FFVI_ScreenReader.Core
             // Unsubscribe from scene load events
             UnityEngine.SceneManagement.SceneManager.sceneLoaded -= (UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.LoadSceneMode>)OnSceneLoaded;
 
+            audioLoopManager?.StopAllLoops();
+            Utils.SoundPlayer.Shutdown();
             CoroutineManager.CleanupAll();
             tolk?.Unload();
         }
@@ -109,6 +130,7 @@ namespace FFVI_ScreenReader.Core
         {
             try
             {
+                Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter = null;
                 LoggerInstance.Msg($"[ComponentCache] Scene loaded: {scene.name}");
 
                 // Try to find and cache FieldPlayerController
@@ -201,8 +223,12 @@ namespace FFVI_ScreenReader.Core
                     {
                         // Map has changed, announce the new map
                         string mapName = Field.MapNameResolver.GetCurrentMapName();
-                        SpeakText($"Entering {mapName}", interrupt: false);
+                        SpeakText(string.Format(T("Entering {0}"), mapName), interrupt: false);
                         lastAnnouncedMapId = currentMapId;
+
+                        // Reset vehicle landing state and vehicle type map for the new map
+                        Patches.MapUIManager_SwitchLandable_Patch.ResetState();
+                        Field.FieldNavigationHelper.ResetVehicleTypeMap();
 
                         // Delay entity scan to allow new map to fully initialize
                         CoroutineManager.StartManaged(DelayedMapTransitionScan());
@@ -225,14 +251,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entities nearby");
+                SpeakText(T("No entities nearby"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Not in field");
+                SpeakText(T("Not in field"));
                 return;
             }
 
@@ -255,7 +281,7 @@ namespace FFVI_ScreenReader.Core
             }
             else
             {
-                announcement = "no path";
+                announcement = T("no path");
             }
 
             SpeakText(announcement);
@@ -272,11 +298,11 @@ namespace FFVI_ScreenReader.Core
                 // Either no entities or no pathable entities found
                 if (entityNavigator.EntityCount == 0)
                 {
-                    SpeakText("No entities nearby");
+                    SpeakText(T("No entities nearby"));
                 }
                 else
                 {
-                    SpeakText("No pathable entities found");
+                    SpeakText(T("No pathable entities found"));
                 }
             }
         }
@@ -292,11 +318,11 @@ namespace FFVI_ScreenReader.Core
                 // Either no entities or no pathable entities found
                 if (entityNavigator.EntityCount == 0)
                 {
-                    SpeakText("No entities nearby");
+                    SpeakText(T("No entities nearby"));
                 }
                 else
                 {
-                    SpeakText("No pathable entities found");
+                    SpeakText(T("No pathable entities found"));
                 }
             }
         }
@@ -306,14 +332,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entities nearby");
+                SpeakText(T("No entities nearby"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Not in field");
+                SpeakText(T("Not in field"));
                 return;
             }
 
@@ -332,15 +358,18 @@ namespace FFVI_ScreenReader.Core
             );
 
             // Announce entity info + path status + count at the end
-            string countSuffix = $", {entityNavigator.CurrentIndex + 1} of {entityNavigator.EntityCount}";
-            string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}, no path{countSuffix}";
+            string countSuffix = string.Format(T(", {0} of {1}"), entityNavigator.CurrentIndex + 1, entityNavigator.EntityCount);
+            string announcement = pathInfo.Success ? $"{formatted}{countSuffix}" : $"{formatted}{T(", no path")}{countSuffix}";
             SpeakText(announcement);
         }
 
         internal void CycleNextCategory()
         {
-            // Cycle to next category
+            // Cycle to next category, skipping Waypoints (they have their own navigation system)
             int nextCategory = ((int)entityNavigator.CurrentCategory + 1) % CategoryCount;
+            if ((EntityCategory)nextCategory == EntityCategory.Waypoints)
+                nextCategory = (nextCategory + 1) % CategoryCount;
+
             EntityCategory newCategory = (EntityCategory)nextCategory;
 
             // Update navigator category (automatically rebuilds list)
@@ -352,10 +381,16 @@ namespace FFVI_ScreenReader.Core
 
         internal void CyclePreviousCategory()
         {
-            // Cycle to previous category
+            // Cycle to previous category, skipping Waypoints (they have their own navigation system)
             int prevCategory = (int)entityNavigator.CurrentCategory - 1;
             if (prevCategory < 0)
                 prevCategory = CategoryCount - 1;
+            if ((EntityCategory)prevCategory == EntityCategory.Waypoints)
+            {
+                prevCategory--;
+                if (prevCategory < 0)
+                    prevCategory = CategoryCount - 1;
+            }
 
             EntityCategory newCategory = (EntityCategory)prevCategory;
 
@@ -370,7 +405,7 @@ namespace FFVI_ScreenReader.Core
         {
             if (entityNavigator.CurrentCategory == EntityCategory.All)
             {
-                SpeakText("Already in All category");
+                SpeakText(T("Already in All category"));
                 return;
             }
 
@@ -389,11 +424,10 @@ namespace FFVI_ScreenReader.Core
             entityNavigator.FilterByPathfinding = filterByPathfinding;
 
             // Save to preferences
-            prefPathfindingFilter.Value = filterByPathfinding;
-            prefsCategory.SaveToFile(false);
+            PreferencesManager.SavePathfindingFilter(filterByPathfinding);
 
-            string status = filterByPathfinding ? "on" : "off";
-            SpeakText($"Pathfinding filter {status}");
+            string status = filterByPathfinding ? T("on") : T("off");
+            SpeakText(string.Format(T("Pathfinding filter {0}"), status));
         }
 
         internal void ToggleMapExitFilter()
@@ -405,19 +439,56 @@ namespace FFVI_ScreenReader.Core
             entityNavigator.RebuildNavigationList();
 
             // Save to preferences
-            prefMapExitFilter.Value = filterMapExits;
-            prefsCategory.SaveToFile(false);
+            PreferencesManager.SaveMapExitFilter(filterMapExits);
 
-            string status = filterMapExits ? "on" : "off";
-            SpeakText($"Map exit filter {status}");
+            string status = filterMapExits ? T("on") : T("off");
+            SpeakText(string.Format(T("Map exit filter {0}"), status));
         }
+
+        internal void ToggleToLayerFilter()
+        {
+            filterToLayer = !filterToLayer;
+
+            // Update navigator (FilterToLayer setter rebuilds the list)
+            entityNavigator.FilterToLayer = filterToLayer;
+
+            // Save to preferences
+            PreferencesManager.SaveToLayerFilter(filterToLayer);
+
+            string status = filterToLayer ? T("on") : T("off");
+            SpeakText(string.Format(T("Layer transition filter {0}"), status));
+        }
+
+        // Static accessors for ModMenu bindings
+        public static bool PathfindingFilterEnabled => Instance?.filterByPathfinding ?? false;
+        public static bool MapExitFilterEnabled => Instance?.filterMapExits ?? false;
+        public static bool ToLayerFilterEnabled => Instance?.filterToLayer ?? false;
+
+        // Audio feature static accessors
+        public static bool WallTonesEnabled => AudioLoopManager.Instance?.IsWallTonesEnabled ?? false;
+        public static bool FootstepsEnabled => AudioLoopManager.Instance?.IsFootstepsEnabled ?? false;
+        public static bool AudioBeaconsEnabled => AudioLoopManager.Instance?.IsAudioBeaconsEnabled ?? false;
+        public static bool ExpCounterEnabled => AudioLoopManager.Instance?.IsExpCounterEnabled ?? false;
+
+        // Volume accessors (read from PreferencesManager)
+        public static int WallBumpVolume => PreferencesManager.WallBumpVolume;
+        public static int FootstepVolume => PreferencesManager.FootstepVolume;
+        public static int WallToneVolume => PreferencesManager.WallToneVolume;
+        public static int BeaconVolume => PreferencesManager.BeaconVolume;
+        public static int ExpCounterVolume => PreferencesManager.ExpCounterVolume;
+
+        // Audio toggle delegation methods
+        internal void ToggleWallTones() => audioLoopManager?.ToggleWallTones();
+        internal void ToggleFootsteps() => audioLoopManager?.ToggleFootsteps();
+        internal void ToggleAudioBeacons() => audioLoopManager?.ToggleAudioBeacons();
+        internal void ToggleExpCounter() => audioLoopManager?.ToggleExpCounter();
 
         private void AnnounceCategoryChange()
         {
             string categoryName = EntityNavigator.GetCategoryName(entityNavigator.CurrentCategory);
             int entityCount = entityNavigator.EntityCount;
 
-            string announcement = $"Category: {categoryName}, {entityCount} {(entityCount == 1 ? "entity" : "entities")}";
+            string announcement = string.Format(T("Category: {0}, {1} {2}"), categoryName, entityCount, entityCount == 1 ? T("entity") : T("entities"));
             SpeakText(announcement);
         }
 
@@ -426,14 +497,14 @@ namespace FFVI_ScreenReader.Core
             var entity = entityNavigator.CurrentEntity;
             if (entity == null)
             {
-                SpeakText("No entity selected");
+                SpeakText(T("No entity selected"));
                 return;
             }
 
             var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
             if (playerController?.fieldPlayer == null)
             {
-                SpeakText("Player not available");
+                SpeakText(T("Player not available"));
                 return;
             }
 
@@ -447,19 +518,20 @@ namespace FFVI_ScreenReader.Core
             // Instantly teleport by setting localPosition directly
             player.transform.localPosition = newPos;
 
-            // Announce direction
+            // Announce direction — use display-friendly name for the entity
             string direction = GetDirectionName(offset);
-            SpeakText($"Teleported {direction} of {entity.Name}");
-            LoggerInstance.Msg($"Teleported {direction} of {entity.Name} to position {newPos}");
+            string entityLabel = entity.DisplayName;
+            SpeakText(string.Format(T("Teleported {0} of {1}"), direction, entityLabel));
+            LoggerInstance.Msg($"Teleported {direction} of {entityLabel} to position {newPos}");
         }
 
         private string GetDirectionName(Vector2 offset)
         {
-            if (offset.y > 0) return "north";
-            if (offset.y < 0) return "south";
-            if (offset.x < 0) return "west";
-            if (offset.x > 0) return "east";
-            return "unknown";
+            if (offset.y > 0) return T("north");
+            if (offset.y < 0) return T("south");
+            if (offset.x < 0) return T("west");
+            if (offset.x > 0) return T("east");
+            return T("unknown");
         }
 
         private void AnnounceCurrentCharacterStatus()
@@ -471,13 +543,13 @@ namespace FFVI_ScreenReader.Core
 
                 if (activeCharacter == null)
                 {
-                    SpeakText("Not in battle or no active character");
+                    SpeakText(T("Not in battle or no active character"));
                     return;
                 }
 
                 if (activeCharacter.ownedCharacterData == null)
                 {
-                    SpeakText("No character data available");
+                    SpeakText(T("No character data available"));
                     return;
                 }
 
@@ -487,7 +559,7 @@ namespace FFVI_ScreenReader.Core
                 // Read HP/MP directly from character parameter
                 if (charData.parameter == null)
                 {
-                    SpeakText($"{characterName}, status information not available");
+                    SpeakText(string.Format(T("{0}, status information not available"), characterName));
                     return;
                 }
 
@@ -498,12 +570,12 @@ namespace FFVI_ScreenReader.Core
                 // Add HP
                 int currentHP = param.CurrentHP;
                 int maxHP = param.ConfirmedMaxHp();
-                statusParts.Add($"HP {currentHP} of {maxHP}");
+                statusParts.Add(string.Format(T("HP {0} of {1}"), currentHP, maxHP));
 
                 // Add MP
                 int currentMP = param.CurrentMP;
                 int maxMP = param.ConfirmedMaxMp();
-                statusParts.Add($"MP {currentMP} of {maxMP}");
+                statusParts.Add(string.Format(T("MP {0} of {1}"), currentMP, maxMP));
 
                 // Add status conditions
                 if (param.CurrentConditionList != null && param.CurrentConditionList.Count > 0)
@@ -532,7 +604,7 @@ namespace FFVI_ScreenReader.Core
 
                     if (conditionNames.Count > 0)
                     {
-                        statusParts.Add("Status: " + string.Join(", ", conditionNames));
+                        statusParts.Add(string.Format(T("Status: {0}"), string.Join(", ", conditionNames)));
                     }
                 }
 
@@ -542,7 +614,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing character status: {ex.Message}");
-                SpeakText("Error reading character status");
+                SpeakText(T("Error reading character status"));
             }
         }
 
@@ -554,19 +626,19 @@ namespace FFVI_ScreenReader.Core
 
                 if (userDataManager == null)
                 {
-                    SpeakText("User data not available");
+                    SpeakText(T("User data not available"));
                     return;
                 }
 
                 int gil = userDataManager.OwendGil;
-                string gilMessage = $"{gil:N0} gil";
+                string gilMessage = string.Format(T("{0} gil"), gil.ToString("N0"));
 
                 SpeakText(gilMessage);
             }
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing gil amount: {ex.Message}");
-                SpeakText("Error reading gil amount");
+                SpeakText(T("Error reading gil amount"));
             }
         }
 
@@ -580,7 +652,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing current map: {ex.Message}");
-                SpeakText("Error reading map name");
+                SpeakText(T("Error reading map name"));
             }
         }
 
@@ -624,7 +696,7 @@ namespace FFVI_ScreenReader.Core
                 var fieldMap = Utils.GameObjectCache.Get<FieldMap>();
                 if (fieldMap == null || fieldMap.fieldController == null)
                 {
-                    SpeakText("Airship status not available");
+                    SpeakText(T("Airship status not available"));
                     return;
                 }
 
@@ -647,7 +719,7 @@ namespace FFVI_ScreenReader.Core
 
                 if (airshipController == null || airshipController.fieldPlayer == null)
                 {
-                    SpeakText("Not on airship");
+                    SpeakText(T("Not on airship"));
                     return;
                 }
 
@@ -659,29 +731,12 @@ namespace FFVI_ScreenReader.Core
                 float normalizedRotation = ((rotationZ % 360) + 360) % 360;
                 // Mirror the rotation to match our E/W swapped compass directions
                 float mirroredRotation = (360 - normalizedRotation) % 360;
-                statusParts.Add($"Heading {mirroredRotation:F0} degrees");
+                statusParts.Add(string.Format(T("Heading {0} degrees"), mirroredRotation.ToString("F0")));
 
                 // Get current altitude
                 float altitudeRatio = fieldMap.fieldController.GetFlightAltitudeFieldOfViewRatio(true);
                 string altitude = Utils.AirshipNavigationReader.GetAltitudeDescription(altitudeRatio);
                 statusParts.Add(altitude);
-
-                // Get landing zone status
-                Vector3 airshipPos = airshipController.fieldPlayer.transform.localPosition;
-                string terrainName;
-                bool canLand;
-                bool success = Utils.AirshipNavigationReader.GetTerrainAtPosition(
-                    airshipPos,
-                    fieldMap.fieldController,
-                    out terrainName,
-                    out canLand
-                );
-
-                if (success)
-                {
-                    string landingStatus = Utils.AirshipNavigationReader.BuildLandingZoneAnnouncement(terrainName, canLand);
-                    statusParts.Add(landingStatus);
-                }
 
                 string statusMessage = string.Join(". ", statusParts);
                 SpeakText(statusMessage);
@@ -689,7 +744,7 @@ namespace FFVI_ScreenReader.Core
             catch (System.Exception ex)
             {
                 LoggerInstance.Warning($"Error announcing airship status: {ex.Message}");
-                SpeakText("Error reading airship status");
+                SpeakText(T("Error reading airship status"));
             }
         }
 
@@ -704,205 +759,27 @@ namespace FFVI_ScreenReader.Core
             tolk?.Speak(text, interrupt);
         }
 
+        public static void SpeakTextDelayed(string text, float delay = 0.3f)
+        {
+            CoroutineManager.StartManaged(DelayedSpeech(text, delay));
+        }
+
+        private static System.Collections.IEnumerator DelayedSpeech(string text, float delay)
+        {
+            yield return new UnityEngine.WaitForSeconds(delay);
+            SpeakText(text, interrupt: true);
+        }
+
         #region Waypoint Methods
-
-        /// <summary>
-        /// Gets the current map ID as a string for waypoint storage
-        /// </summary>
-        private string GetCurrentMapIdString()
-        {
-            try
-            {
-                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
-                if (userDataManager != null)
-                {
-                    return userDataManager.CurrentMapId.ToString();
-                }
-            }
-            catch (System.Exception ex)
-            {
-                LoggerInstance.Warning($"Error getting map ID: {ex.Message}");
-            }
-            return "unknown";
-        }
-
-        /// <summary>
-        /// Cycles to the next waypoint and announces it
-        /// </summary>
-        internal void CycleNextWaypoint()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-
-            var waypoint = waypointNavigator.CycleNext();
-            if (waypoint == null)
-            {
-                SpeakText("No waypoints");
-                return;
-            }
-
-            SpeakText(waypointNavigator.FormatCurrentWaypoint());
-        }
-
-        /// <summary>
-        /// Cycles to the previous waypoint and announces it
-        /// </summary>
-        internal void CyclePreviousWaypoint()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-
-            var waypoint = waypointNavigator.CyclePrevious();
-            if (waypoint == null)
-            {
-                SpeakText("No waypoints");
-                return;
-            }
-
-            SpeakText(waypointNavigator.FormatCurrentWaypoint());
-        }
-
-        /// <summary>
-        /// Cycles to the next waypoint category
-        /// </summary>
-        internal void CycleNextWaypointCategory()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.CycleNextCategory(mapId);
-            SpeakText(waypointNavigator.GetCategoryAnnouncement());
-        }
-
-        /// <summary>
-        /// Cycles to the previous waypoint category
-        /// </summary>
-        internal void CyclePreviousWaypointCategory()
-        {
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.CyclePreviousCategory(mapId);
-            SpeakText(waypointNavigator.GetCategoryAnnouncement());
-        }
-
-        /// <summary>
-        /// Pathfinds to the currently selected waypoint
-        /// </summary>
-        internal void PathfindToCurrentWaypoint()
-        {
-            var waypoint = waypointNavigator.SelectedWaypoint;
-            if (waypoint == null)
-            {
-                SpeakText("No waypoint selected");
-                return;
-            }
-
-            var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
-            if (playerController == null || playerController.fieldPlayer == null || playerController.fieldPlayer.transform == null)
-            {
-                SpeakText("Not in field");
-                return;
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-
-            var pathInfo = Field.FieldNavigationHelper.FindPathTo(
-                playerPos,
-                waypoint.Position,
-                playerController.mapHandle,
-                playerController.fieldPlayer
-            );
-
-            if (pathInfo.Success)
-            {
-                SpeakText($"Path to {waypoint.WaypointName}: {pathInfo.Description}");
-            }
-            else
-            {
-                // Still announce distance and direction even without path
-                string description = waypoint.FormatDescription(playerPos);
-                SpeakText($"No path to {waypoint.WaypointName}. {description}");
-            }
-        }
-
-        /// <summary>
-        /// Adds a new waypoint at the player's current position
-        /// </summary>
-        internal void AddNewWaypoint()
-        {
-            var playerController = Utils.GameObjectCache.Get<Il2CppLast.Map.FieldPlayerController>();
-            if (playerController == null || playerController.fieldPlayer == null || playerController.fieldPlayer.transform == null)
-            {
-                SpeakText("Not in field");
-                return;
-            }
-
-            Vector3 playerPos = playerController.fieldPlayer.transform.localPosition;
-            string mapId = GetCurrentMapIdString();
-
-            // Determine category - use current filter unless it's "All"
-            var category = waypointNavigator.CurrentCategory;
-            if (category == Field.WaypointCategory.All)
-            {
-                category = Field.WaypointCategory.Miscellaneous;
-            }
-
-            // Generate auto-name
-            string name = waypointManager.GetNextWaypointName(mapId);
-
-            var waypoint = waypointManager.AddWaypoint(name, playerPos, mapId, category);
-            waypointNavigator.RefreshList(mapId);
-
-            string categoryName = Field.WaypointEntity.GetCategoryDisplayName(category);
-            SpeakText($"Added {name} as {categoryName}");
-        }
-
-        /// <summary>
-        /// Removes the currently selected waypoint
-        /// </summary>
-        internal void RemoveCurrentWaypoint()
-        {
-            var waypoint = waypointNavigator.SelectedWaypoint;
-            if (waypoint == null)
-            {
-                SpeakText("No waypoint selected");
-                return;
-            }
-
-            string name = waypoint.WaypointName;
-            waypointManager.RemoveWaypoint(waypoint.WaypointId);
-
-            string mapId = GetCurrentMapIdString();
-            waypointNavigator.RefreshList(mapId);
-            waypointNavigator.ClearSelection();
-
-            SpeakText($"Removed {name}");
-        }
-
-        /// <summary>
-        /// Clears all waypoints for the current map (with double-press confirmation)
-        /// </summary>
-        internal void ClearAllWaypointsForMap()
-        {
-            string mapId = GetCurrentMapIdString();
-
-            if (waypointManager.ClearMapWaypoints(mapId, out int count))
-            {
-                waypointNavigator.RefreshList(mapId);
-                waypointNavigator.ClearSelection();
-
-                if (count > 0)
-                {
-                    SpeakText($"Cleared {count} waypoints from map");
-                }
-                else
-                {
-                    SpeakText("No waypoints to clear");
-                }
-            }
-            else
-            {
-                SpeakText($"Press again within 2 seconds to clear {count} waypoints");
-            }
-        }
-
+        internal void CycleNextWaypoint() => waypointController.CycleNextWaypoint();
+        internal void CyclePreviousWaypoint() => waypointController.CyclePreviousWaypoint();
+        internal void CycleNextWaypointCategory() => waypointController.CycleNextWaypointCategory();
+        internal void CyclePreviousWaypointCategory() => waypointController.CyclePreviousWaypointCategory();
+        internal void PathfindToCurrentWaypoint() => waypointController.PathfindToCurrentWaypoint();
+        internal void AddNewWaypointWithNaming() => waypointController.AddNewWaypointWithNaming();
+        internal void RenameCurrentWaypoint() => waypointController.RenameCurrentWaypoint();
+        internal void RemoveCurrentWaypoint() => waypointController.RemoveCurrentWaypoint();
+        internal void ClearAllWaypointsForMap() => waypointController.ClearAllWaypointsForMap();
         #endregion
     }
 }

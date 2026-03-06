@@ -1,6 +1,11 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Il2Cpp;
+using MelonLoader;
+using FFVI_ScreenReader.Utils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
+using ConfigActualDetailsControllerBase_KeyInput = Il2CppLast.UI.KeyInput.ConfigActualDetailsControllerBase;
+using ConfigActualDetailsControllerBase_Touch = Il2CppLast.UI.Touch.ConfigActualDetailsControllerBase;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -11,7 +16,6 @@ namespace FFVI_ScreenReader.Core
     public class InputManager
     {
         private readonly FFVI_ScreenReaderMod mod;
-        private Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController cachedStatusController;
 
         public InputManager(FFVI_ScreenReaderMod mod)
         {
@@ -23,6 +27,34 @@ namespace FFVI_ScreenReader.Core
         /// </summary>
         public void Update()
         {
+            // Handle modal dialogs (consume all input when open)
+            if (ConfirmationDialog.HandleInput()) return;
+            if (TextInputWindow.HandleInput()) return;
+
+            // Handle mod menu input (uses Win32 GetAsyncKeyState, works without game focus)
+            if (ModMenu.HandleInput()) return;
+
+            // Handle status screen navigation (Up/Down/Shift/Ctrl+arrows for stat browsing)
+            if (Menus.StatusNavigationReader.IsActive)
+            {
+                if (Input.anyKeyDown && HandleStatusNavigationInput())
+                    return;
+            }
+
+            // Handle bestiary detail navigation (Up/Down/Shift/Ctrl+arrows for stat browsing)
+            if (Menus.BestiaryNavigationReader.IsActive)
+            {
+                if (Input.anyKeyDown && HandleBestiaryInput())
+                    return;
+            }
+
+            // Handle item detail navigator (Up/Down navigation, auto-deactivates when screen closes)
+            if (Menus.ItemDetailNavigator.IsActive)
+            {
+                if (Input.anyKeyDown && Menus.ItemDetailNavigator.HandleInput())
+                    return; // Consumed Up/Down, let other keys pass through
+            }
+
             // Early exit if no keys pressed this frame - avoids expensive FindObjectOfType calls
             if (!Input.anyKeyDown)
             {
@@ -36,17 +68,23 @@ namespace FFVI_ScreenReader.Core
                 return;
             }
 
-            // Check if status details screen is active to route J/L keys appropriately
-            bool statusScreenActive = IsStatusScreenActive();
+            // F8: Open mod menu (blocked during battle)
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                if (FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter != null)
+                {
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                }
+                else
+                {
+                    FFVI_ScreenReaderMod.SpeakText(T("Mod menu"));
+                    ModMenu.Open();
+                }
+                return;
+            }
 
-            if (statusScreenActive)
-            {
-                HandleStatusScreenInput();
-            }
-            else
-            {
-                HandleFieldInput();
-            }
+            // J/L/[/] always route to field input (no more status screen branching)
+            HandleFieldInput();
 
             // Global hotkeys (work in both field and status screen)
             HandleGlobalInput();
@@ -83,39 +121,65 @@ namespace FFVI_ScreenReader.Core
         }
 
         /// <summary>
-        /// Checks if the status details screen is currently active.
-        /// Uses cached reference to avoid expensive FindObjectOfType calls.
+        /// Handles arrow key input for status screen stat navigation.
+        /// Returns true if input was consumed.
         /// </summary>
-        private bool IsStatusScreenActive()
+        private bool HandleStatusNavigationInput()
         {
-            // Validate cache - check if controller exists and is still valid
-            if (cachedStatusController == null || cachedStatusController.gameObject == null)
+            if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                cachedStatusController = Utils.GameObjectCache.Get<Il2CppSerial.FF6.UI.KeyInput.StatusDetailsController>();
+                if (IsCtrlHeld())
+                    Menus.StatusNavigationReader.JumpToBottom();
+                else if (IsShiftHeld())
+                    Menus.StatusNavigationReader.JumpToNextGroup();
+                else
+                    Menus.StatusNavigationReader.NavigateNext();
+                return true;
             }
 
-            return cachedStatusController != null &&
-                   cachedStatusController.gameObject != null &&
-                   cachedStatusController.gameObject.activeInHierarchy;
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (IsCtrlHeld())
+                    Menus.StatusNavigationReader.JumpToTop();
+                else if (IsShiftHeld())
+                    Menus.StatusNavigationReader.JumpToPreviousGroup();
+                else
+                    Menus.StatusNavigationReader.NavigatePrevious();
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
-        /// Handles input when on the status details screen.
+        /// Handles arrow key input for bestiary detail stat navigation.
+        /// Returns true if input was consumed.
         /// </summary>
-        private void HandleStatusScreenInput()
+        private bool HandleBestiaryInput()
         {
-            // On status screen: J/[ announces physical stats, L/] announces magical stats
-            if (Input.GetKeyDown(KeyCode.J) || Input.GetKeyDown(KeyCode.LeftBracket))
+            if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                string physicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadPhysicalStats();
-                FFVI_ScreenReaderMod.SpeakText(physicalStats);
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToBottom();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToNextGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigateNext();
+                return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.L) || Input.GetKeyDown(KeyCode.RightBracket))
+            if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                string magicalStats = FFVI_ScreenReader.Menus.StatusDetailsReader.ReadMagicalStats();
-                FFVI_ScreenReaderMod.SpeakText(magicalStats);
+                if (IsCtrlHeld())
+                    Menus.BestiaryNavigationReader.JumpToTop();
+                else if (IsShiftHeld())
+                    Menus.BestiaryNavigationReader.JumpToPreviousGroup();
+                else
+                    Menus.BestiaryNavigationReader.NavigatePrevious();
+                return true;
             }
+
+            return false;
         }
 
         /// <summary>
@@ -159,8 +223,8 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // Hotkey: P or \ to pathfind to current entity
-            if (Input.GetKeyDown(KeyCode.P) || Input.GetKeyDown(KeyCode.Backslash))
+            // Hotkey: P or \ to pathfind to current entity (skip \ when Ctrl held — handled in HandleGlobalInput)
+            if (Input.GetKeyDown(KeyCode.P) || (Input.GetKeyDown(KeyCode.Backslash) && !IsCtrlHeld()))
             {
                 // Check for Shift+P/\ (toggle pathfinding filter)
                 if (IsShiftHeld())
@@ -172,6 +236,111 @@ namespace FFVI_ScreenReader.Core
                     // Just P/\ (pathfind to current entity)
                     mod.AnnounceCurrentEntity();
                 }
+            }
+
+            // Audio toggle hotkeys
+            // Quote ('): Toggle footsteps
+            if (Input.GetKeyDown(KeyCode.Quote))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    mod.ToggleFootsteps();
+            }
+
+            // Semicolon (;): Toggle wall tones
+            if (Input.GetKeyDown(KeyCode.Semicolon))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    mod.ToggleWallTones();
+            }
+
+            // Alpha9 (9): Toggle audio beacons
+            if (Input.GetKeyDown(KeyCode.Alpha9))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    mod.ToggleAudioBeacons();
+            }
+
+            // F5: Cycle Enemy HP Display mode
+            if (Input.GetKeyDown(KeyCode.F5))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                {
+                    int current = PreferencesManager.EnemyHPDisplay;
+                    int next = (current + 1) % 3;
+                    PreferencesManager.SetEnemyHPDisplay(next);
+                    string[] labels = { T("Numbers"), T("Percentage"), T("Hidden") };
+                    FFVI_ScreenReaderMod.SpeakText(string.Format(T("Enemy HP: {0}"), labels[next]));
+                }
+            }
+
+            // F1: Announce walk/run state
+            if (Input.GetKeyDown(KeyCode.F1))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    CoroutineManager.StartUntracked(AnnounceWalkRunState());
+            }
+
+            // F3: Announce encounter state
+            if (Input.GetKeyDown(KeyCode.F3))
+            {
+                if (IsInBattle())
+                    FFVI_ScreenReaderMod.SpeakText(T("Unavailable in battle"));
+                else
+                    CoroutineManager.StartUntracked(AnnounceEncounterState());
+            }
+
+        }
+
+        private static System.Collections.IEnumerator AnnounceWalkRunState()
+        {
+            // Wait 3 frames for game to process the toggle
+            yield return null;
+            yield return null;
+            yield return null;
+            try
+            {
+                var playerController = UnityEngine.Object.FindObjectOfType<Il2CppLast.Map.FieldPlayerController>();
+                var player = playerController?.fieldPlayer;
+                if (player == null) yield break;
+
+                bool isDashing = (int)player.moveState == 1; // Dush
+                var userDataManager = Il2CppLast.Management.UserDataManager.Instance();
+                bool autoDash = (userDataManager?.Config?.IsAutoDash ?? 0) != 0;
+                bool isRunning = autoDash != isDashing; // XOR logic
+
+                FFVI_ScreenReaderMod.SpeakText(isRunning ? T("Run") : T("Walk"));
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading walk/run state: {ex.Message}");
+            }
+        }
+
+        private static System.Collections.IEnumerator AnnounceEncounterState()
+        {
+            yield return null;
+            try
+            {
+                var userData = Il2CppLast.Management.UserDataManager.Instance();
+                if (userData?.CheatSettingsData != null)
+                {
+                    bool enabled = userData.CheatSettingsData.IsEnableEncount;
+                    FFVI_ScreenReaderMod.SpeakText(enabled ? T("Encounters on") : T("Encounters off"));
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading encounter state: {ex.Message}");
             }
         }
 
@@ -193,10 +362,14 @@ namespace FFVI_ScreenReader.Core
                 }
             }
 
-            // Period: Cycle waypoints
+            // Period: Cycle waypoints or rename
             if (Input.GetKeyDown(KeyCode.Period))
             {
-                if (IsShiftHeld())
+                if (IsCtrlHeld())
+                {
+                    mod.RenameCurrentWaypoint();
+                }
+                else if (IsShiftHeld())
                 {
                     mod.CycleNextWaypointCategory();
                 }
@@ -211,7 +384,7 @@ namespace FFVI_ScreenReader.Core
             {
                 if (IsCtrlHeld() && IsShiftHeld())
                 {
-                    mod.ClearAllWaypointsForMap(); // Double-press confirmation
+                    mod.ClearAllWaypointsForMap();
                 }
                 else if (IsCtrlHeld())
                 {
@@ -219,7 +392,7 @@ namespace FFVI_ScreenReader.Core
                 }
                 else if (IsShiftHeld())
                 {
-                    mod.AddNewWaypoint();
+                    mod.AddNewWaypointWithNaming();
                 }
                 else
                 {
@@ -236,10 +409,14 @@ namespace FFVI_ScreenReader.Core
             // Handle waypoint hotkeys (works anywhere on field)
             HandleWaypointInput();
 
-            // Hotkey: Ctrl+Arrow to teleport in the direction of the arrow
+            // Hotkey: Ctrl+Arrow to teleport, Ctrl+\ to toggle layer filter
             if (IsCtrlHeld())
             {
-                if (Input.GetKeyDown(KeyCode.UpArrow))
+                if (Input.GetKeyDown(KeyCode.Backslash))
+                {
+                    mod.ToggleToLayerFilter();
+                }
+                else if (Input.GetKeyDown(KeyCode.UpArrow))
                 {
                     mod.TeleportInDirection(new Vector2(0, 16)); // North
                 }
@@ -307,6 +484,19 @@ namespace FFVI_ScreenReader.Core
                 mod.CyclePreviousCategory();
             }
 
+            // Hotkey: I to announce item/config details, Shift+I for key help tooltips
+            if (Input.GetKeyDown(KeyCode.I))
+            {
+                if (IsShiftHeld())
+                {
+                    Menus.KeyHelpReader.AnnounceKeyHelp();
+                }
+                else
+                {
+                    HandleItemInfoKey();
+                }
+            }
+
             // Hotkey: T to announce active timers
             if (Input.GetKeyDown(KeyCode.T))
             {
@@ -321,6 +511,107 @@ namespace FFVI_ScreenReader.Core
                     Patches.TimerHelper.AnnounceActiveTimers();
                 }
             }
+        }
+
+        private void HandleItemInfoKey()
+        {
+            // Try Blitz input sequence first (field menu only)
+            if (Patches.SpecialAbilityContentListController_SelectContent_AbilityMenu_Patch.TryAnnounceBlitzSequence())
+                return;
+
+            // Try esper details re-read first
+            if (Patches.MagicStoneDetailsController_Show_Patch.TryReannounceEsperDetails())
+                return;
+
+            // Try item menu equip check
+            if (Menus.ItemEquipAnnouncer.TryAnnounceEquipRequirements())
+                return;
+
+            // Try shop info - re-read the current description if in a shop
+            try
+            {
+                var shopInfo = UnityEngine.Object.FindObjectOfType<Il2CppLast.UI.KeyInput.ShopInfoController>();
+                if (shopInfo != null && shopInfo.gameObject != null && shopInfo.gameObject.activeInHierarchy)
+                {
+                    // Re-read description and MP cost
+                    string description = shopInfo.view?.descriptionText?.text;
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        string mpCost = shopInfo.itemInfoController?.shopItemInfoView?.mpText?.text;
+                        string announcement = string.IsNullOrEmpty(mpCost) ? description : $"{description}. {mpCost}";
+                        FFVI_ScreenReaderMod.SpeakText(announcement);
+                        return;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error reading shop info: {ex.Message}");
+            }
+
+            // Fall back to config tooltip
+            AnnounceConfigTooltip();
+        }
+
+        private void AnnounceConfigTooltip()
+        {
+            try
+            {
+                var keyInputController = Utils.GameObjectCache.Get<ConfigActualDetailsControllerBase_KeyInput>();
+                if (keyInputController == null)
+                    keyInputController = Utils.GameObjectCache.Refresh<ConfigActualDetailsControllerBase_KeyInput>();
+
+                if (keyInputController != null && keyInputController.gameObject.activeInHierarchy)
+                {
+                    string description = TryReadDescriptionText(() => keyInputController.descriptionText);
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        FFVI_ScreenReaderMod.SpeakText(description);
+                        return;
+                    }
+                }
+
+                var touchController = Utils.GameObjectCache.Get<ConfigActualDetailsControllerBase_Touch>();
+                if (touchController == null)
+                    touchController = Utils.GameObjectCache.Refresh<ConfigActualDetailsControllerBase_Touch>();
+
+                if (touchController != null && touchController.gameObject.activeInHierarchy)
+                {
+                    string description = TryReadDescriptionText(() => touchController.descriptionText);
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        FFVI_ScreenReaderMod.SpeakText(description);
+                        return;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Error($"Error reading config tooltip: {ex.Message}");
+            }
+        }
+
+        private string TryReadDescriptionText(System.Func<UnityEngine.UI.Text> getTextField)
+        {
+            try
+            {
+                var descText = getTextField();
+                if (descText != null && !string.IsNullOrWhiteSpace(descText.text))
+                    return descText.text.Trim();
+            }
+            catch (System.Exception ex)
+            {
+                MelonLogger.Warning($"Error accessing description text: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Checks if the player is currently in battle.
+        /// </summary>
+        private bool IsInBattle()
+        {
+            return FFVI_ScreenReader.Patches.BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter != null;
         }
 
         /// <summary>

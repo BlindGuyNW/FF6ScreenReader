@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Linq;
+using System.Runtime.InteropServices;
 using HarmonyLib;
 using MelonLoader;
 using Il2CppLast.Data;
@@ -7,11 +9,29 @@ using Il2CppLast.Data.User;
 using Il2CppLast.UI.KeyInput;
 using Il2CppLast.Management;
 using Il2CppLast.Systems;
+using UnityEngine;
 using FFVI_ScreenReader.Core;
+using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
+    // Shared state across battle-result patch classes
+    internal static class BattleResultState
+    {
+        // True only while EXP counter sound is actually playing.
+        internal static bool ExpCounterPlaying;
+
+        internal static void StopExpCounterIfPlaying()
+        {
+            if (!ExpCounterPlaying) return;
+            ExpCounterPlaying = false;
+            SoundPlayer.StopExpCounter();
+            MelonLogger.Msg("[Battle Results] EXP counter stopped");
+        }
+    }
+
     /// <summary>
     /// Patches for battle result announcements (XP, Magic AP, gil, level ups)
     /// </summary>
@@ -35,9 +55,20 @@ namespace FFVI_ScreenReader.Patches
                 // Build announcement message
                 var messageParts = new System.Collections.Generic.List<string>();
 
+                // Diagnostic dump of all point fields
+                MelonLogger.Msg($"[Battle Results] Fields: Gil={data._GetGil_k__BackingField}, Exp={data._GetExp_k__BackingField}, Abp={data._GetAbp_k__BackingField}, Mp={data._GetMp_k__BackingField}");
+
                 // Announce gil gained
                 int gil = data._GetGil_k__BackingField;
-                messageParts.Add($"{gil:N0} gil");
+                messageParts.Add(string.Format(T("{0} gil"), gil.ToString("N0")));
+
+                // Announce Magic AP (FF6 uses Mp field for Esper Magic AP, not Abp which is FF5's job system)
+                int magicAp = data._GetMp_k__BackingField;
+                MelonLogger.Msg($"[Battle Results] Magic AP value: {magicAp}");
+                if (magicAp > 0)
+                {
+                    messageParts.Add(string.Format(T("{0} Magic AP"), magicAp));
+                }
 
                 // Announce items dropped
                 if (data._ItemList_k__BackingField != null && data._ItemList_k__BackingField.Count > 0)
@@ -65,7 +96,7 @@ namespace FFVI_ScreenReader.Patches
                                     int quantity = itemContent.Count;
                                     if (quantity > 1)
                                     {
-                                        messageParts.Add($"{itemName} x{quantity}");
+                                        messageParts.Add(string.Format(T("{0} x{1}"), itemName, quantity));
                                     }
                                     else
                                     {
@@ -87,63 +118,18 @@ namespace FFVI_ScreenReader.Patches
                         if (charResult == null) continue;
 
                         var afterData = charResult.AfterData;
-                        var beforeData = charResult.BeforData;
                         if (afterData == null) continue;
 
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
-                        // Calculate Magic AP by comparing ALL abilities before vs after
-                        int totalMagicAp = 0;
-                        
-                        // Compare all abilities in afterData with beforeData to find skill level changes
-                        if (beforeData != null && beforeData.OwnedAbilityList != null && 
-                            afterData.OwnedAbilityList != null)
-                        {
-                            foreach (var afterAbility in afterData.OwnedAbilityList)
-                            {
-                                if (afterAbility == null || afterAbility.Ability == null) continue;
-                                
-                                int abilityId = afterAbility.Ability.Id;
-                                int afterSkillLevel = afterAbility.SkillLevel;
-                                
-                                // Find matching ability in before data
-                                for (int i = 0; i < beforeData.OwnedAbilityList.Count; i++)
-                                {
-                                    var beforeAbility = beforeData.OwnedAbilityList[i];
-                                    if (beforeAbility == null || beforeAbility.Ability == null) continue;
-                                    
-                                    if (beforeAbility.Ability.Id == abilityId)
-                                    {
-                                        int beforeSkillLevel = beforeAbility.SkillLevel;
-                                        int skillLevelGain = afterSkillLevel - beforeSkillLevel;
-                                        
-                                        if (skillLevelGain > 0)
-                                        {
-                                            totalMagicAp += skillLevelGain;
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Build XP and Magic AP announcement
-                        string progressAnnouncement;
-                        if (totalMagicAp > 0)
-                        {
-                            progressAnnouncement = $"{charName} gained {charExp:N0} XP and {totalMagicAp} Magic AP";
-                        }
-                        else
-                        {
-                            progressAnnouncement = $"{charName} gained {charExp:N0} XP";
-                        }
+                        string progressAnnouncement = string.Format(T("{0} gained {1} XP"), charName, charExp.ToString("N0"));
 
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            progressAnnouncement += $" and leveled up to level {newLevel}";
+                            progressAnnouncement += string.Format(T(" and leveled up to level {0}"), newLevel);
                         }
 
                         messageParts.Add(progressAnnouncement);
@@ -174,7 +160,7 @@ namespace FFVI_ScreenReader.Patches
                                         string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
                                         if (!string.IsNullOrWhiteSpace(abilityName))
                                         {
-                                            messageParts.Add($"{charName} learned {abilityName}");
+                                            messageParts.Add(string.Format(T("{0} learned {1}"), charName, abilityName));
                                         }
                                     }
                                 }
@@ -220,12 +206,23 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Diagnostic dump of all point fields
+                MelonLogger.Msg($"[Battle Results] Fields: Gil={data._GetGil_k__BackingField}, Exp={data._GetExp_k__BackingField}, Abp={data._GetAbp_k__BackingField}, Mp={data._GetMp_k__BackingField}");
+
                 // Build announcement message
                 var messageParts = new System.Collections.Generic.List<string>();
 
                 // Announce gil gained
                 int gil = data._GetGil_k__BackingField;
-                messageParts.Add($"{gil:N0} gil");
+                messageParts.Add(string.Format(T("{0} gil"), gil.ToString("N0")));
+
+                // Announce Magic AP (FF6 uses Mp field for Esper Magic AP, not Abp which is FF5's job system)
+                int magicAp = data._GetMp_k__BackingField;
+                MelonLogger.Msg($"[Battle Results] Magic AP value: {magicAp}");
+                if (magicAp > 0)
+                {
+                    messageParts.Add(string.Format(T("{0} Magic AP"), magicAp));
+                }
 
                 // Announce items dropped
                 if (data._ItemList_k__BackingField != null && data._ItemList_k__BackingField.Count > 0)
@@ -253,7 +250,7 @@ namespace FFVI_ScreenReader.Patches
                                     int quantity = itemContent.Count;
                                     if (quantity > 1)
                                     {
-                                        messageParts.Add($"{itemName} x{quantity}");
+                                        messageParts.Add(string.Format(T("{0} x{1}"), itemName, quantity));
                                     }
                                     else
                                     {
@@ -275,63 +272,18 @@ namespace FFVI_ScreenReader.Patches
                         if (charResult == null) continue;
 
                         var afterData = charResult.AfterData;
-                        var beforeData = charResult.BeforData;
                         if (afterData == null) continue;
 
                         string charName = afterData.Name;
                         int charExp = charResult.GetExp;
 
-                        // Calculate Magic AP by comparing ALL abilities before vs after
-                        int totalMagicAp = 0;
-                        
-                        // Compare all abilities in afterData with beforeData to find skill level changes
-                        if (beforeData != null && beforeData.OwnedAbilityList != null && 
-                            afterData.OwnedAbilityList != null)
-                        {
-                            foreach (var afterAbility in afterData.OwnedAbilityList)
-                            {
-                                if (afterAbility == null || afterAbility.Ability == null) continue;
-                                
-                                int abilityId = afterAbility.Ability.Id;
-                                int afterSkillLevel = afterAbility.SkillLevel;
-                                
-                                // Find matching ability in before data
-                                for (int i = 0; i < beforeData.OwnedAbilityList.Count; i++)
-                                {
-                                    var beforeAbility = beforeData.OwnedAbilityList[i];
-                                    if (beforeAbility == null || beforeAbility.Ability == null) continue;
-                                    
-                                    if (beforeAbility.Ability.Id == abilityId)
-                                    {
-                                        int beforeSkillLevel = beforeAbility.SkillLevel;
-                                        int skillLevelGain = afterSkillLevel - beforeSkillLevel;
-                                        
-                                        if (skillLevelGain > 0)
-                                        {
-                                            totalMagicAp += skillLevelGain;
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Build XP and Magic AP announcement
-                        string progressAnnouncement;
-                        if (totalMagicAp > 0)
-                        {
-                            progressAnnouncement = $"{charName} gained {charExp:N0} XP and {totalMagicAp} Magic AP";
-                        }
-                        else
-                        {
-                            progressAnnouncement = $"{charName} gained {charExp:N0} XP";
-                        }
+                        string progressAnnouncement = string.Format(T("{0} gained {1} XP"), charName, charExp.ToString("N0"));
 
                         // Check if leveled up
                         if (charResult.IsLevelUp)
                         {
                             int newLevel = afterData.parameter?.ConfirmedLevel() ?? 0;
-                            progressAnnouncement += $" and leveled up to level {newLevel}";
+                            progressAnnouncement += string.Format(T(" and leveled up to level {0}"), newLevel);
                         }
 
                         messageParts.Add(progressAnnouncement);
@@ -362,13 +314,21 @@ namespace FFVI_ScreenReader.Patches
                                         string abilityName = messageManager.GetMessage(ownedAbility.MesIdName);
                                         if (!string.IsNullOrWhiteSpace(abilityName))
                                         {
-                                            messageParts.Add($"{charName} learned {abilityName}");
+                                            messageParts.Add(string.Format(T("{0} learned {1}"), charName, abilityName));
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                }
+
+                // Start EXP counter beep if enabled (before duplicate check so it always runs)
+                if (FFVI_ScreenReaderMod.ExpCounterEnabled)
+                {
+                    SoundPlayer.PlayExpCounter();
+                    BattleResultState.ExpCounterPlaying = true;
+                    CoroutineManager.StartUntracked(MonitorExpCounterAnimation(__instance.Pointer));
                 }
 
                 // Announce the combined message
@@ -390,6 +350,93 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in ResultMenuController.ShowPointsInit patch: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// Monitors the per-character EXP rolling animation via pointer chain and stops
+        /// the EXP counter sound when the animation finishes.
+        /// Chain: instance -> +0x20 (pointController) -> +0x30 (characterListController)
+        ///   -> +0x20 (contentList, count at +0x18)
+        ///   -> +0x30 (perormanceEndCount)
+        /// Animation done when: perormanceEndCount >= contentList.Count && Count > 0
+        /// </summary>
+        private static IEnumerator MonitorExpCounterAnimation(IntPtr instancePtr)
+        {
+            var wait = new WaitForSeconds(0.1f);
+            bool loggedOnce = false;
+
+            // Navigate pointer chain once with diagnostic logging
+            if (instancePtr == IntPtr.Zero)
+            {
+                MelonLogger.Warning("[Battle Results] MonitorExp: instancePtr is null");
+                BattleResultState.StopExpCounterIfPlaying();
+                yield break;
+            }
+
+            IntPtr pointControllerPtr = Marshal.ReadIntPtr(instancePtr, 0x20);
+            if (pointControllerPtr == IntPtr.Zero)
+            {
+                MelonLogger.Warning("[Battle Results] MonitorExp: pointController is null");
+                BattleResultState.StopExpCounterIfPlaying();
+                yield break;
+            }
+
+            IntPtr charListCtrlPtr = Marshal.ReadIntPtr(pointControllerPtr, 0x30);
+            if (charListCtrlPtr == IntPtr.Zero)
+            {
+                MelonLogger.Warning("[Battle Results] MonitorExp: characterListController is null");
+                BattleResultState.StopExpCounterIfPlaying();
+                yield break;
+            }
+
+            IntPtr contentListPtr = Marshal.ReadIntPtr(charListCtrlPtr, 0x20);
+            if (contentListPtr == IntPtr.Zero)
+            {
+                MelonLogger.Warning("[Battle Results] MonitorExp: contentList is null");
+                BattleResultState.StopExpCounterIfPlaying();
+                yield break;
+            }
+
+            // contentList.Count (List._size) at contentListPtr + 0x18
+            int contentCount = Marshal.ReadInt32(contentListPtr, 0x18);
+            if (contentCount <= 0)
+            {
+                MelonLogger.Warning($"[Battle Results] MonitorExp: contentCount={contentCount}, aborting");
+                BattleResultState.StopExpCounterIfPlaying();
+                yield break;
+            }
+
+            MelonLogger.Msg($"[Battle Results] MonitorExp: chain OK, charListCtrl=0x{charListCtrlPtr:X}, contentCount={contentCount}");
+
+            // Poll until animation finishes or counter was already stopped
+            while (BattleResultState.ExpCounterPlaying)
+            {
+                yield return wait;
+
+                try
+                {
+                    int endCount = Marshal.ReadInt32(charListCtrlPtr, 0x30);
+
+                    if (!loggedOnce)
+                    {
+                        MelonLogger.Msg($"[Battle Results] MonitorExp: first poll endCount={endCount}/{contentCount}");
+                        loggedOnce = true;
+                    }
+
+                    if (endCount >= contentCount)
+                    {
+                        MelonLogger.Msg($"[Battle Results] MonitorExp: animation done (endCount={endCount} >= contentCount={contentCount})");
+                        BattleResultState.StopExpCounterIfPlaying();
+                        yield break;
+                    }
+                }
+                catch
+                {
+                    // Pointer became invalid -- bail out, safety nets will handle it
+                    BattleResultState.StopExpCounterIfPlaying();
+                    yield break;
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using FFVI_ScreenReader.Core;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Field
 {
@@ -10,9 +11,10 @@ namespace FFVI_ScreenReader.Field
     public enum WaypointCategory
     {
         All = 0,           // Filter only - shows all waypoints
-        Landmarks = 1,     // Towns, dungeons, notable locations
-        AirshipLandings = 2, // Airship landing zones
-        Miscellaneous = 3  // Default category for new waypoints
+        Docks = 1,         // Ship/boat docking locations
+        Landmarks = 2,     // Towns, dungeons, notable locations
+        AirshipLandings = 3, // Airship landing zones
+        Miscellaneous = 4  // Default category for new waypoints
     }
 
     /// <summary>
@@ -71,14 +73,16 @@ namespace FFVI_ScreenReader.Field
         {
             switch (category)
             {
+                case WaypointCategory.Docks:
+                    return T("Dock");
                 case WaypointCategory.Landmarks:
-                    return "Landmark";
+                    return T("Landmark");
                 case WaypointCategory.AirshipLandings:
-                    return "Airship Landing";
+                    return T("Airship Landing");
                 case WaypointCategory.Miscellaneous:
-                    return "Waypoint";
+                    return T("Waypoint");
                 default:
-                    return "Waypoint";
+                    return T("Waypoint");
             }
         }
 
@@ -87,7 +91,7 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public static string[] GetCategoryNames()
         {
-            return new string[] { "All", "Landmarks", "Airship Landings", "Miscellaneous" };
+            return new string[] { T("All"), T("Docks"), T("Landmarks"), T("Airship Landings"), T("Miscellaneous") };
         }
     }
 }

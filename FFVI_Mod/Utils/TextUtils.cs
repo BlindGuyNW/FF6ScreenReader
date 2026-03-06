@@ -15,6 +15,11 @@ namespace FFVI_ScreenReader.Utils
             @"<[iI][cC]_[^>]+>",
             RegexOptions.Compiled);
 
+        // Compiled regex for stripping Unity rich text tags (e.g., <b>, <color=#FF0000>, </size>)
+        private static readonly Regex RichTextRegex = new Regex(
+            @"</?[a-zA-Z][^>]*>",
+            RegexOptions.Compiled);
+
         /// <summary>
         /// Removes icon markup tags from text (e.g., &lt;ic_Drag&gt;, &lt;IC_DRAG&gt;).
         /// Uses a pre-compiled regex for better performance.
@@ -27,6 +32,18 @@ namespace FFVI_ScreenReader.Utils
                 return string.Empty;
 
             return IconMarkupRegex.Replace(text, "").Trim();
+        }
+
+        /// <summary>
+        /// Removes Unity rich text tags from text (e.g., &lt;b&gt;, &lt;color=#FF0000&gt;, &lt;/size&gt;).
+        /// Uses a pre-compiled regex for better performance.
+        /// </summary>
+        public static string StripRichTextTags(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            return RichTextRegex.Replace(text, "").Trim();
         }
 
         /// <summary>

@@ -87,36 +87,6 @@ namespace FFVI_ScreenReader.Patches
         }
 
         /// <summary>
-        /// Announces item descriptions when they update in the info panel.
-        /// </summary>
-        [HarmonyPatch(typeof(ShopInfoController), nameof(ShopInfoController.SetDescription))]
-        [HarmonyPostfix]
-        private static void AfterSetDescription(ShopInfoController __instance, string value)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(value))
-                    return;
-
-                // Also get MP cost if available
-                string mpCost = __instance.itemInfoController?.shopItemInfoView?.mpText?.text;
-
-                // Build the announcement
-                string announcement = value;
-                if (!string.IsNullOrEmpty(mpCost))
-                {
-                    announcement = $"{value}. {mpCost}";
-                }
-
-                CoroutineManager.StartManaged(DelayedAnnounceDescription(announcement));
-            }
-            catch (System.Exception ex)
-            {
-                MelonLogger.Error($"Error in AfterSetDescription: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Announces quantity changes in the buy/sell trade window.
         /// </summary>
         [HarmonyPatch(typeof(ShopTradeWindowController), nameof(ShopTradeWindowController.AddCount))]
@@ -169,12 +139,6 @@ namespace FFVI_ScreenReader.Patches
         {
             yield return null; // Wait one frame for UI to update
             FFVI_ScreenReaderMod.SpeakText($"{itemText}");
-        }
-
-        private static IEnumerator DelayedAnnounceDescription(string descriptionText)
-        {
-            yield return null; // Wait one frame for UI to update
-            FFVI_ScreenReaderMod.SpeakText($"{descriptionText}");
         }
 
         private static IEnumerator DelayedAnnounceQuantity(string quantityText)

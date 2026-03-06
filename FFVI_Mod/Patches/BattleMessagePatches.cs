@@ -700,6 +700,18 @@ namespace FFVI_ScreenReader.Patches
         }
     }
 
+    // Clear CurrentActiveCharacter when battle ends so IsInBattle() doesn't stay stuck
+    [HarmonyPatch(typeof(Il2CppLast.Battle.BattleController),
+                  nameof(Il2CppLast.Battle.BattleController.Exit))]
+    public static class BattleController_Exit_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix()
+        {
+            BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter = null;
+        }
+    }
+
 
     // DISABLED - Touch controls not needed for keyboard/controller
     /*
@@ -1004,7 +1016,18 @@ namespace FFVI_ScreenReader.Patches
                                             int currentHP = unitDataInfo.Parameter.CurrentHP;
                                             int maxHP = unitDataInfo.Parameter.ConfirmedMaxHp();
 
-                                            announcement += $", HP {currentHP}/{maxHP}";
+                                            switch (Core.PreferencesManager.EnemyHPDisplay)
+                                            {
+                                                case 0: // Numbers
+                                                    announcement += $", HP {currentHP}/{maxHP}";
+                                                    break;
+                                                case 1: // Percentage
+                                                    int percentage = maxHP > 0 ? (int)Math.Round((double)currentHP / maxHP * 100) : 0;
+                                                    announcement += $", {percentage}% HP";
+                                                    break;
+                                                case 2: // Hidden
+                                                    break;
+                                            }
                                         }
                                     }
                                     catch (Exception hpEx)

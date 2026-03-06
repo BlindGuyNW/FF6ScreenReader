@@ -34,6 +34,17 @@ namespace FFVI_ScreenReader.Field
                 return null;
             }
 
+            // Check VehicleTypeMap first – vehicles may not have a distinctive ObjectType
+            if (FieldNavigationHelper.VehicleTypeMap.TryGetValue(fieldEntity, out var vehicleInfo))
+            {
+                return new VehicleEntity
+                {
+                    GameEntity = fieldEntity,
+                    TransportationId = vehicleInfo.Type,
+                    MessageId = vehicleInfo.MessageId
+                };
+            }
+
             // Get ObjectType from property
             Il2Cpp.MapConstants.ObjectType objectType = Il2Cpp.MapConstants.ObjectType.PointIn;
             if (fieldEntity.Property != null)
@@ -92,7 +103,8 @@ namespace FFVI_ScreenReader.Field
                    objectType == Il2Cpp.MapConstants.ObjectType.ChangeAnimationKeyArea ||
                    objectType == Il2Cpp.MapConstants.ObjectType.DamageFloorGimmickArea ||
                    objectType == Il2Cpp.MapConstants.ObjectType.SlidingFloorGimmickArea ||
-                   objectType == Il2Cpp.MapConstants.ObjectType.TimeSwitchingGimmickArea;
+                   objectType == Il2Cpp.MapConstants.ObjectType.TimeSwitchingGimmickArea ||
+                   objectType == Il2Cpp.MapConstants.ObjectType.OpenTrigger;
         }
 
         /// <summary>
@@ -116,9 +128,6 @@ namespace FFVI_ScreenReader.Field
 
                 case Il2Cpp.MapConstants.ObjectType.SavePoint:
                     return new SavePointEntity { GameEntity = fieldEntity };
-
-                case Il2Cpp.MapConstants.ObjectType.OpenTrigger:
-                    return new DoorTriggerEntity { GameEntity = fieldEntity };
 
                 case Il2Cpp.MapConstants.ObjectType.TelepoPoint:
                 case Il2Cpp.MapConstants.ObjectType.Event:

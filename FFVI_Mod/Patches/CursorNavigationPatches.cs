@@ -39,6 +39,18 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -62,7 +74,7 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     string parentName = parent.name.ToLower();
-                    if (parentName.Contains("battle_target") || 
+                    if (parentName.Contains("battle_target") ||
                         parentName.Contains("battletarget") ||
                         parentName.Contains("battle_command") ||
                         parentName.Contains("battlecommand") ||
@@ -89,6 +101,28 @@ namespace FFVI_ScreenReader.Patches
                         return;
                     }
                     parent = parent.parent;
+                }
+
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "NextIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
                 }
 
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
@@ -147,6 +181,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -185,13 +230,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "NextIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -227,6 +272,18 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -250,7 +307,7 @@ namespace FFVI_ScreenReader.Patches
                 while (parent != null)
                 {
                     string parentName = parent.name.ToLower();
-                    if (parentName.Contains("battle_target") || 
+                    if (parentName.Contains("battle_target") ||
                         parentName.Contains("battletarget") ||
                         parentName.Contains("battle_command") ||
                         parentName.Contains("battlecommand") ||
@@ -277,6 +334,28 @@ namespace FFVI_ScreenReader.Patches
                         return;
                     }
                     parent = parent.parent;
+                }
+
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "PrevIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
                 }
 
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
@@ -335,6 +414,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -373,13 +463,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "PrevIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -415,6 +505,18 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -465,6 +567,28 @@ namespace FFVI_ScreenReader.Patches
                         return;
                     }
                     parent = parent.parent;
+                }
+
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "SkipNextIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
                 }
 
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
@@ -523,6 +647,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -561,13 +696,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "SkipNextIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {
@@ -603,6 +738,18 @@ namespace FFVI_ScreenReader.Patches
                     return;
                 }
 
+                // Handle popup button navigation (Yes/No, etc.)
+                if (PopupState.ShouldSuppress())
+                {
+                    PopupPatches.ReadCurrentButton(__instance);
+                    return;
+                }
+
+                // Skip if bestiary/music player/gallery navigation (handled by dedicated patches)
+                if (BestiaryStateTracker.IsInBestiary) return;
+                if (MusicPlayerStateTracker.IsInMusicPlayer) return;
+                if (GalleryStateTracker.IsInGallery) return;
+
                 // Skip if this is item target selection (handled by ItemUseController.SelectContent patch)
                 var parent = __instance.transform.parent;
                 while (parent != null)
@@ -653,6 +800,28 @@ namespace FFVI_ScreenReader.Patches
                         return;
                     }
                     parent = parent.parent;
+                }
+
+                // Language dropdown: detect BEFORE config skip so it reaches text discovery
+                bool isLanguageDropdown = false;
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("language") || parent.name.Contains("Language"))
+                    {
+                        isLanguageDropdown = true;
+                        break;
+                    }
+                    parent = parent.parent;
+                }
+
+                if (isLanguageDropdown)
+                {
+                    // Fall through directly to text discovery — skip all other skip blocks
+                    var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                        __instance, "SkipPrevIndex", count, isLoop);
+                    CoroutineManager.StartManaged(coroutine);
+                    return;
                 }
 
                 // Skip if this is config menu navigation (handled by ConfigCommandController.SetFocus patch)
@@ -711,6 +880,17 @@ namespace FFVI_ScreenReader.Patches
                     parent = parent.parent;
                 }
 
+                // Skip if this is Coliseum navigation (handled by ColiseumPatches)
+                parent = __instance.transform.parent;
+                while (parent != null)
+                {
+                    if (parent.name.Contains("colosseum") || parent.name.Contains("Colosseum"))
+                    {
+                        return;
+                    }
+                    parent = parent.parent;
+                }
+
                 // Skip if this is party setting menu (handled by PartySettingMenuBaseController.SelectContent patch)
                 parent = __instance.transform.parent;
                 while (parent != null)
@@ -749,13 +929,13 @@ namespace FFVI_ScreenReader.Patches
                 }
 
                 // Use managed coroutine system
-                var coroutine = MenuTextDiscovery.WaitAndReadCursor(
+                var coroutine2 = MenuTextDiscovery.WaitAndReadCursor(
                     __instance,
                     "SkipPrevIndex",
                     count,
                     isLoop
                 );
-                CoroutineManager.StartManaged(coroutine);
+                CoroutineManager.StartManaged(coroutine2);
             }
             catch (Exception ex)
             {

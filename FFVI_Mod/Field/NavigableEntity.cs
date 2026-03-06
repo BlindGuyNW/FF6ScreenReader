@@ -26,7 +26,14 @@ namespace FFVI_ScreenReader.Field
         /// <summary>
         /// Entity name (localized if available)
         /// </summary>
-        public virtual string Name => GameEntity?.Property?.Name ?? "Unknown";
+        public virtual string Name
+        {
+            get
+            {
+                string rawName = GameEntity?.Property?.Name ?? "Unknown";
+                return Utils.EntityTranslator.Translate(rawName);
+            }
+        }
 
         /// <summary>
         /// Category for filtering purposes
@@ -47,6 +54,11 @@ namespace FFVI_ScreenReader.Field
         /// Whether this entity is currently interactive
         /// </summary>
         public virtual bool IsInteractive => true;
+
+        /// <summary>
+        /// Resolved display name for this entity (used for announcements)
+        /// </summary>
+        public string DisplayName => GetDisplayName();
 
         /// <summary>
         /// Gets the display name for this entity (without distance/direction)
@@ -126,7 +138,18 @@ namespace FFVI_ScreenReader.Field
         protected override string GetDisplayName()
         {
             string status = IsOpened ? "Opened" : "Unopened";
-            return $"{status} {Name}";
+            return $"{status} Treasure Chest";
+        }
+
+        /// <summary>
+        /// Suppress the trailing "- Treasure Chest" type suffix since
+        /// "Treasure Chest" is already in the display name.
+        /// </summary>
+        public override string FormatDescription(Vector3 playerPos)
+        {
+            float distance = Vector3.Distance(playerPos, Position);
+            string direction = GetDirection(playerPos, Position);
+            return $"{GetDisplayName()} ({FormatSteps(distance)} {direction})";
         }
 
         protected override string GetEntityTypeName()
@@ -176,34 +199,6 @@ namespace FFVI_ScreenReader.Field
             if (string.IsNullOrEmpty(assetName))
                 return null;
 
-            // Check P-codes for playable characters
-            var characterMap = new Dictionary<string, string>
-            {
-                { "P001", "Terra" },
-                { "P002", "Locke" },
-                { "P003", "Cyan" },
-                { "P004", "Shadow" },
-                { "P005", "Edgar" },
-                { "P006", "Sabin" },
-                { "P007", "Celes" },
-                { "P008", "Strago" },
-                { "P009", "Relm" },
-                { "P010", "Setzer" },
-                { "P011", "Mog" },
-                { "P012", "Gau" },
-                { "P013", "Gogo" },
-                { "P014", "Umaro" }
-            };
-
-            // Check if asset name contains a P-code
-            foreach (var kvp in characterMap)
-            {
-                if (assetName.Contains(kvp.Key))
-                {
-                    return kvp.Value;
-                }
-            }
-
             // Try NPC master data
             try
             {
@@ -246,14 +241,8 @@ namespace FFVI_ScreenReader.Field
                 characterName = GetCharacterName(AssetName);
             }
 
-            if (!string.IsNullOrEmpty(characterName))
-            {
-                details.Add(characterName);
-            }
-            else if (!string.IsNullOrEmpty(AssetName) && AssetName != Name)
-            {
-                details.Add(AssetName);
-            }
+            // Use characterName as display name when available, fall back to Name
+            string displayName = !string.IsNullOrEmpty(characterName) ? characterName : Name;
 
             // Add shop indicator
             if (IsShop)
@@ -277,7 +266,7 @@ namespace FFVI_ScreenReader.Field
             }
 
             string detailStr = details.Count > 0 ? $" ({string.Join(", ", details)})" : "";
-            return $"{Name}{detailStr}";
+            return $"{displayName}{detailStr}";
         }
 
         protected override string GetEntityTypeName()
@@ -309,10 +298,16 @@ namespace FFVI_ScreenReader.Field
 
         protected override string GetDisplayName()
         {
-            // Build enhanced name with destination
-            return !string.IsNullOrEmpty(DestinationName)
-                ? $"{Name} → {DestinationName}"
-                : Name;
+            if (!string.IsNullOrEmpty(DestinationName))
+            {
+                // If Name contains Japanese characters and game isn't in Japanese,
+                // it's untranslated and redundant when we already have a localized destination name
+                if (Utils.EntityTranslator.DetectLanguage() != "ja" &&
+                    Utils.EntityTranslator.ContainsJapaneseCharacters(Name))
+                    return DestinationName;
+                return $"{Name} → {DestinationName}";
+            }
+            return Name;
         }
 
         protected override string GetEntityTypeName()
@@ -450,6 +445,11 @@ namespace FFVI_ScreenReader.Field
         /// </summary>
         public int TransportationId { get; set; }
 
+        /// <summary>
+        /// Message ID for localized vehicle name lookup
+        /// </summary>
+        public string MessageId { get; set; }
+
         public override EntityCategory Category => EntityCategory.Vehicles;
 
         public override int Priority => 10;
@@ -458,7 +458,7 @@ namespace FFVI_ScreenReader.Field
 
         protected override string GetDisplayName()
         {
-            return GetVehicleName(TransportationId);
+            return GetVehicleName(TransportationId, MessageId);
         }
 
         protected override string GetEntityTypeName()
@@ -466,16 +466,25 @@ namespace FFVI_ScreenReader.Field
             return "Vehicle";
         }
 
-        public static string GetVehicleName(int id)
+        public static string GetVehicleName(int id, string messageId = null)
         {
-            // Based on MapConstants.TransportationType enum
+            // Try MessageId first for localized name
+            if (!string.IsNullOrEmpty(messageId))
+            {
+                try
+                {
+                    var msg = Il2CppLast.Management.MessageManager.Instance?.GetMessage(messageId);
+                    if (!string.IsNullOrEmpty(msg))
+                        return msg;
+                }
+                catch { }
+            }
+
+            // Fallback to hardcoded names based on MapConstants.TransportationType enum
             switch (id)
             {
-                case 1: return "Player";
                 case 2: return "Ship";
                 case 3: return "Airship";
-                case 4: return "Symbol";
-                case 5: return "Content";
                 case 6: return "Submarine";
                 case 7: return "Low Flying Airship";
                 case 8: return "Special Airship";

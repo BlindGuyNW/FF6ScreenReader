@@ -15,9 +15,104 @@ using UnityEngine;
 namespace FFVI_ScreenReader.Patches
 {
     /// <summary>
+    /// Tracks navigation state within the status screen for arrow key navigation.
+    /// </summary>
+    public class StatusNavigationTracker
+    {
+        private static StatusNavigationTracker instance = null;
+        public static StatusNavigationTracker Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = new StatusNavigationTracker();
+                }
+                return instance;
+            }
+        }
+
+        public bool IsNavigationActive { get; set; }
+        public int CurrentStatIndex { get; set; }
+        public OwnedCharacterData CurrentCharacterData { get; set; }
+        public StatusDetailsController ActiveController { get; set; }
+
+        private StatusNavigationTracker()
+        {
+            Reset();
+        }
+
+        public void Reset()
+        {
+            IsNavigationActive = false;
+            CurrentStatIndex = 0;
+            CurrentCharacterData = null;
+            ActiveController = null;
+        }
+
+        public bool ValidateState()
+        {
+            return IsNavigationActive &&
+                   CurrentCharacterData != null &&
+                   ActiveController != null &&
+                   ActiveController.gameObject != null &&
+                   ActiveController.gameObject.activeInHierarchy;
+        }
+    }
+
+    /// <summary>
+    /// Helper methods for status screen patches.
+    /// </summary>
+    public static class StatusDetailsHelpers
+    {
+        /// <summary>
+        /// Extract character data from the StatusDetailsController.
+        /// </summary>
+        public static OwnedCharacterData GetCharacterDataFromController(StatusDetailsController controller)
+        {
+            try
+            {
+                var statusController = controller?.statusController;
+                if (statusController != null)
+                {
+                    try
+                    {
+                        var targetData = statusController.targetData;
+                        if (targetData != null)
+                        {
+                            return targetData;
+                        }
+                    }
+                    catch
+                    {
+                        // Direct access failed, try Traverse
+                    }
+
+                    try
+                    {
+                        var traversed = Traverse.Create(statusController).Field("targetData").GetValue<OwnedCharacterData>();
+                        if (traversed != null)
+                        {
+                            return traversed;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Warning($"[Status] Traverse access failed: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error accessing character data: {ex.Message}");
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Controller-based patches for the character status menu.
     /// Announces character names when navigating the selection list and status details when viewing.
-    /// Provides hotkeys for detailed stat announcements ([=physical, ]=magical).
     /// </summary>
 
     /// <summary>
@@ -146,9 +241,34 @@ namespace FFVI_ScreenReader.Patches
                     yield break;
                 }
 
-                // No deduplication - announce every time InitDisplay is called
+                // Announce status overview
                 MelonLogger.Msg($"[Status Details] {statusText}");
                 FFVI_ScreenReaderMod.SpeakText(statusText);
+
+                // Initialize navigation state
+                try
+                {
+                    var characterData = StatusDetailsHelpers.GetCharacterDataFromController(controller);
+                    if (characterData != null)
+                    {
+                        var tracker = StatusNavigationTracker.Instance;
+                        tracker.IsNavigationActive = true;
+                        tracker.CurrentStatIndex = 0;
+                        tracker.ActiveController = controller;
+                        tracker.CurrentCharacterData = characterData;
+
+                        StatusDetailsReader.SetCurrentCharacterData(characterData);
+                        StatusNavigationReader.InitializeStatList();
+                    }
+                    else
+                    {
+                        MelonLogger.Warning("[Status] Could not get character data for navigation");
+                    }
+                }
+                catch (Exception navEx)
+                {
+                    MelonLogger.Warning($"Error initializing navigation: {navEx.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -165,13 +285,11 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Safety checks
                 if (__instance == null)
                 {
                     return;
                 }
 
-                // Use coroutine for one-frame delay to ensure UI has updated
                 CoroutineManager.StartManaged(DelayedPlayerChangeAnnouncement(__instance));
             }
             catch (Exception ex)
@@ -182,7 +300,6 @@ namespace FFVI_ScreenReader.Patches
 
         private static IEnumerator DelayedPlayerChangeAnnouncement(StatusDetailsController controller)
         {
-            // Wait one frame for UI to update
             yield return null;
 
             try
@@ -192,7 +309,6 @@ namespace FFVI_ScreenReader.Patches
                     yield break;
                 }
 
-                // Read all status details
                 string statusText = StatusDetailsReader.ReadStatusDetails(controller);
 
                 if (string.IsNullOrWhiteSpace(statusText))
@@ -202,6 +318,24 @@ namespace FFVI_ScreenReader.Patches
 
                 MelonLogger.Msg($"[Status Next] {statusText}");
                 FFVI_ScreenReaderMod.SpeakText(statusText);
+
+                // Re-initialize tracker with new character data
+                try
+                {
+                    var characterData = StatusDetailsHelpers.GetCharacterDataFromController(controller);
+                    if (characterData != null)
+                    {
+                        var tracker = StatusNavigationTracker.Instance;
+                        tracker.CurrentStatIndex = 0;
+                        tracker.ActiveController = controller;
+                        tracker.CurrentCharacterData = characterData;
+                        StatusDetailsReader.SetCurrentCharacterData(characterData);
+                    }
+                }
+                catch (Exception navEx)
+                {
+                    MelonLogger.Warning($"Error re-initializing navigation after player change: {navEx.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -218,13 +352,11 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Safety checks
                 if (__instance == null)
                 {
                     return;
                 }
 
-                // Use coroutine for one-frame delay to ensure UI has updated
                 CoroutineManager.StartManaged(DelayedPlayerChangeAnnouncement(__instance));
             }
             catch (Exception ex)
@@ -235,7 +367,6 @@ namespace FFVI_ScreenReader.Patches
 
         private static IEnumerator DelayedPlayerChangeAnnouncement(StatusDetailsController controller)
         {
-            // Wait one frame for UI to update
             yield return null;
 
             try
@@ -245,7 +376,6 @@ namespace FFVI_ScreenReader.Patches
                     yield break;
                 }
 
-                // Read all status details
                 string statusText = StatusDetailsReader.ReadStatusDetails(controller);
 
                 if (string.IsNullOrWhiteSpace(statusText))
@@ -255,6 +385,24 @@ namespace FFVI_ScreenReader.Patches
 
                 MelonLogger.Msg($"[Status Prev] {statusText}");
                 FFVI_ScreenReaderMod.SpeakText(statusText);
+
+                // Re-initialize tracker with new character data
+                try
+                {
+                    var characterData = StatusDetailsHelpers.GetCharacterDataFromController(controller);
+                    if (characterData != null)
+                    {
+                        var tracker = StatusNavigationTracker.Instance;
+                        tracker.CurrentStatIndex = 0;
+                        tracker.ActiveController = controller;
+                        tracker.CurrentCharacterData = characterData;
+                        StatusDetailsReader.SetCurrentCharacterData(characterData);
+                    }
+                }
+                catch (Exception navEx)
+                {
+                    MelonLogger.Warning($"Error re-initializing navigation after player change: {navEx.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -264,7 +412,7 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch SetParameter to store character data for hotkey access.
+    /// Patch SetParameter to store character data for navigation.
     /// </summary>
     [HarmonyPatch(typeof(StatusDetailsController), nameof(StatusDetailsController.SetParameter))]
     public static class StatusDetailsController_SetParameter_Patch
@@ -274,8 +422,14 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Store character data for hotkey access
                 StatusDetailsReader.SetCurrentCharacterData(data);
+
+                // Also update tracker if navigation is active
+                var tracker = StatusNavigationTracker.Instance;
+                if (tracker.IsNavigationActive && data != null)
+                {
+                    tracker.CurrentCharacterData = data;
+                }
             }
             catch (Exception ex)
             {
@@ -285,7 +439,7 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
-    /// Patch ExitDisplay to clear character data when leaving status screen.
+    /// Patch ExitDisplay to clear character data and reset navigation when leaving status screen.
     /// </summary>
     [HarmonyPatch(typeof(StatusDetailsController), nameof(StatusDetailsController.ExitDisplay))]
     public static class StatusDetailsController_ExitDisplay_Patch
@@ -295,8 +449,8 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
-                // Clear character data when leaving status screen
                 StatusDetailsReader.ClearCurrentCharacterData();
+                StatusNavigationTracker.Instance.Reset();
             }
             catch (Exception ex)
             {

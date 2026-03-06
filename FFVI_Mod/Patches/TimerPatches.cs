@@ -7,6 +7,7 @@ using Il2CppLast.UI.Common.Map;
 using Il2CppLast.Timer;
 using FFVI_ScreenReader.Core;
 using UnityEngine;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -47,13 +48,13 @@ namespace FFVI_ScreenReader.Patches
             {
                 timersFrozen = !timersFrozen;
 
-                string message = timersFrozen ? "Timers frozen" : "Timers resumed";
+                string message = timersFrozen ? T("Timers frozen") : T("Timers resumed");
                 FFVI_ScreenReaderMod.SpeakText(message, interrupt: true);
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error toggling timer freeze: {ex.Message}");
-                FFVI_ScreenReaderMod.SpeakText("Error toggling timer freeze", interrupt: true);
+                FFVI_ScreenReaderMod.SpeakText(T("Error toggling timer freeze"), interrupt: true);
             }
         }
         /// <summary>
@@ -127,14 +128,14 @@ namespace FFVI_ScreenReader.Patches
                 }
                 else
                 {
-                    FFVI_ScreenReaderMod.SpeakText("No active timers", interrupt: true);
+                    FFVI_ScreenReaderMod.SpeakText(T("No active timers"), interrupt: true);
                     return false;
                 }
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error announcing timers: {ex.Message}");
-                FFVI_ScreenReaderMod.SpeakText("Error reading timers", interrupt: true);
+                FFVI_ScreenReaderMod.SpeakText(T("Error reading timers"), interrupt: true);
                 return false;
             }
         }
@@ -167,8 +168,7 @@ namespace FFVI_ScreenReader.Patches
             // Parse minutes
             if (!string.IsNullOrEmpty(minutes) && int.TryParse(minutes, out int min) && min > 0)
             {
-                result.Append(min);
-                result.Append(min == 1 ? " minute" : " minutes");
+                result.Append(min == 1 ? string.Format(T("{0} minute"), min) : string.Format(T("{0} minutes"), min));
             }
 
             // Parse seconds
@@ -177,8 +177,7 @@ namespace FFVI_ScreenReader.Patches
                 if (result.Length > 0)
                     result.Append(" ");
 
-                result.Append(sec);
-                result.Append(sec == 1 ? " second" : " seconds");
+                result.Append(sec == 1 ? string.Format(T("{0} second"), sec) : string.Format(T("{0} seconds"), sec));
             }
 
             // If we couldn't parse anything, return the raw text
@@ -212,7 +211,7 @@ namespace FFVI_ScreenReader.Patches
             }
 
             // If we can't parse it, just return it as-is
-            return "Timer: " + timerText;
+            return T("Timer: ") + timerText;
         }
     }
 }

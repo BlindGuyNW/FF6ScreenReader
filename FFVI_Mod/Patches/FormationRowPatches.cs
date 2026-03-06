@@ -6,6 +6,7 @@ using Il2CppLast.Defaine.User;
 using Il2CppLast.Management;
 using Il2CppLast.UI.KeyInput;
 using MelonLoader;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -62,15 +63,15 @@ namespace FFVI_ScreenReader.Patches
                 string newRow;
                 if (currentId == CorpsId.Front)
                 {
-                    newRow = "Back Row";
+                    newRow = T("Back Row");
                 }
                 else if (currentId == CorpsId.Back)
                 {
-                    newRow = "Front Row";
+                    newRow = T("Front Row");
                 }
                 else
                 {
-                    newRow = $"Unknown Row Type {currentId}";
+                    newRow = string.Format(T("Unknown Row Type {0}"), currentId);
                     MelonLogger.Warning($"Unexpected corps ID: {currentId}");
                 }
 

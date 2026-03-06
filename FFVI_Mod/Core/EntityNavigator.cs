@@ -6,6 +6,7 @@ using FFVI_ScreenReader.Field;
 using FFVI_ScreenReader.Core.Filters;
 using Il2Cpp;
 using Il2CppLast.Map;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Core
 {
@@ -24,6 +25,7 @@ namespace FFVI_ScreenReader.Core
 
         private CategoryFilter categoryFilter;
         private PathfindingFilter pathfindingFilter;
+        private ToLayerFilter toLayerFilter;
         private MapExitGroupingStrategy mapExitGroupingStrategy;
         private WorldMapEntranceGroupingStrategy worldMapEntranceGroupingStrategy;
         private bool filterMapExits = false;
@@ -36,6 +38,23 @@ namespace FFVI_ScreenReader.Core
         {
             get => pathfindingFilter.IsEnabled;
             set => pathfindingFilter.IsEnabled = value;
+        }
+
+        /// <summary>
+        /// Whether to filter out ToLayer (layer transition) entities.
+        /// Since this is an OnAdd filter, toggling requires rebuilding the list.
+        /// </summary>
+        public bool FilterToLayer
+        {
+            get => toLayerFilter.IsEnabled;
+            set
+            {
+                if (toLayerFilter.IsEnabled != value)
+                {
+                    toLayerFilter.IsEnabled = value;
+                    RebuildNavigationList();
+                }
+            }
         }
 
         /// <summary>
@@ -97,6 +116,7 @@ namespace FFVI_ScreenReader.Core
             // Initialize filters
             categoryFilter = new CategoryFilter();
             pathfindingFilter = new PathfindingFilter();
+            toLayerFilter = new ToLayerFilter();
             mapExitGroupingStrategy = new MapExitGroupingStrategy();
             worldMapEntranceGroupingStrategy = new WorldMapEntranceGroupingStrategy();
 
@@ -106,6 +126,7 @@ namespace FFVI_ScreenReader.Core
             // Register entity filters
             entityFilters.Add(categoryFilter);
             entityFilters.Add(pathfindingFilter);
+            entityFilters.Add(toLayerFilter);
 
             // Subscribe to cache events
             cache.OnEntityAdded += HandleEntityAdded;
@@ -427,19 +448,21 @@ namespace FFVI_ScreenReader.Core
             switch (category)
             {
                 case EntityCategory.All:
-                    return "All";
+                    return T("All");
                 case EntityCategory.Chests:
-                    return "Chests";
+                    return T("Chests");
                 case EntityCategory.NPCs:
-                    return "NPCs";
+                    return T("NPCs");
                 case EntityCategory.MapExits:
-                    return "Map Exits";
+                    return T("Map Exits");
                 case EntityCategory.Events:
-                    return "Events";
+                    return T("Events");
                 case EntityCategory.Vehicles:
-                    return "Vehicles";
+                    return T("Vehicles");
+                case EntityCategory.Waypoints:
+                    return T("Waypoints");
                 default:
-                    return "Unknown";
+                    return category.ToString();
             }
         }
     }

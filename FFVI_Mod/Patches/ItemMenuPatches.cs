@@ -10,6 +10,14 @@ using static FFVI_ScreenReader.Utils.TextUtils;
 namespace FFVI_ScreenReader.Patches
 {
     /// <summary>
+    /// Track item menu state for I key equipment compatibility lookup.
+    /// </summary>
+    public static class ItemMenuTracker
+    {
+        public static ItemListContentData LastSelectedItem { get; set; }
+    }
+
+    /// <summary>
     /// Patches for item and equipment menu navigation.
     /// Announces item/equipment name, quantity, and description when browsing.
     /// </summary>
@@ -57,6 +65,9 @@ namespace FFVI_ScreenReader.Patches
                 {
                     return;
                 }
+
+                // Track for I key equipment compatibility lookup
+                ItemMenuTracker.LastSelectedItem = itemData;
 
                 string itemName = itemData.Name;
                 if (string.IsNullOrEmpty(itemName))

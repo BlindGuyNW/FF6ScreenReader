@@ -6,11 +6,16 @@ using Il2CppLast.Battle;
 using Il2CppLast.UI;
 using Il2CppLast.Data.Master;
 using Il2CppLast.Data.User;
+using Il2CppLast.Defaine;
 using Il2CppLast.Management;
+using Il2CppLast.Systems;
+using Il2CppSerial;
 using Il2CppSerial.FF6.UI.KeyInput;
+using Il2CppSerial.Template.UI.KeyInput;
 using FFVI_ScreenReader.Core;
 using FFVI_ScreenReader.Utils;
 using static FFVI_ScreenReader.Utils.TextUtils;
+using static FFVI_ScreenReader.Utils.ModTextTranslator;
 
 namespace FFVI_ScreenReader.Patches
 {
@@ -360,6 +365,21 @@ namespace FFVI_ScreenReader.Patches
                 // Build announcement
                 string announcement = abilityName;
 
+                // Add MP cost from the content view's valueText
+                try
+                {
+                    var contentView = selectedContent.view;
+                    if (contentView != null)
+                    {
+                        var mpText = contentView.valueText;
+                        if (mpText != null && !string.IsNullOrWhiteSpace(mpText.text) && mpText.text.Trim() != "0")
+                        {
+                            announcement += string.Format(T(", MP {0}"), mpText.text);
+                        }
+                    }
+                }
+                catch { /* MP text not available, continue without it */ }
+
                 // Add description if available
                 if (!string.IsNullOrWhiteSpace(mesIdDescription))
                 {
@@ -367,6 +387,10 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(abilityName + ":"))
+                            description = description.Substring(abilityName.Length + 1).TrimStart();
+
                         announcement += $", {description}";
                     }
                 }
@@ -389,6 +413,107 @@ namespace FFVI_ScreenReader.Patches
     }
 
     /// <summary>
+    /// Patch for summon ability selection in battle magic.
+    /// When a character has an esper equipped, the Magic command shows a "Summon" ability
+    /// at the top of the screen, separate from the scrollable spell list.
+    /// This patches SelectPhantomBeastContent to announce the summon ability name.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleQuantityAbilityInfomationController),
+        nameof(BattleQuantityAbilityInfomationController.SelectPhantomBeastContent),
+        new Type[] { typeof(Cursor) })]
+    public static class BattleQuantityAbilityInfomationController_SelectPhantomBeastContent_Patch
+    {
+        private static string lastAnnouncement = "";
+
+        [HarmonyPostfix]
+        public static void Postfix(BattleQuantityAbilityInfomationController __instance, Cursor targetCursor)
+        {
+            try
+            {
+                if (__instance == null || targetCursor == null)
+                    return;
+
+                // Get the phantom beast content controller from the View
+                BattleAbilityInfomationContentController phantomBeastContent = null;
+                try
+                {
+                    var view = ((BattleAbilityInfomationControllerBase)__instance).View;
+                    if (view != null)
+                        phantomBeastContent = view.PhantomBeastContent;
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"[Battle Summon] View access failed: {ex.Message}");
+                }
+
+                if (phantomBeastContent == null)
+                    return;
+
+                // Read summon name from the displayed UI text (iconTextView.nameText)
+                // PhantomBeastContent.Data is null at runtime — the game only populates the UI text
+                string summonName = null;
+                try
+                {
+                    var iconText = phantomBeastContent.iconTextView;
+                    if (iconText != null && iconText.nameText != null)
+                        summonName = iconText.nameText.text;
+                }
+                catch { }
+
+                summonName = StripIconMarkup(summonName ?? "");
+                if (string.IsNullOrWhiteSpace(summonName))
+                    return;
+
+                // Read MP cost from the content view's valueText (same pattern as regular spells)
+                string mpCost = null;
+                try
+                {
+                    var contentView = phantomBeastContent.view;
+                    if (contentView != null && contentView.valueText != null)
+                    {
+                        string mpVal = contentView.valueText.text;
+                        if (!string.IsNullOrWhiteSpace(mpVal) && mpVal.Trim() != "0")
+                            mpCost = mpVal;
+                    }
+                }
+                catch { }
+
+                // Read description from the parent view's descriptionText
+                string description = null;
+                try
+                {
+                    var parentView = ((BattleAbilityInfomationControllerBase)__instance).View;
+                    if (parentView != null && parentView.descriptionText != null)
+                    {
+                        string desc = parentView.descriptionText.text;
+                        if (!string.IsNullOrWhiteSpace(desc))
+                            description = StripIconMarkup(desc);
+                    }
+                }
+                catch { }
+
+                // Build announcement: "Summon, Name, MP X, Description"
+                string announcement = string.Format(T("Summon, {0}"), summonName);
+                if (mpCost != null)
+                    announcement += string.Format(T(", MP {0}"), mpCost);
+                if (!string.IsNullOrWhiteSpace(description))
+                    announcement += $", {description}";
+
+                if (announcement == lastAnnouncement)
+                    return;
+                lastAnnouncement = announcement;
+
+                MelonLogger.Msg($"[Battle Summon] {announcement}");
+                FFVI_ScreenReaderMod.SpeakText(announcement);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in SelectPhantomBeastContent patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Patch for special ability/tool selection in battle (e.g., Edgar's Tools, Sabin's Blitz).
     /// Announces tool/special ability names when navigating the submenu.
     /// This controller manages the ability command submenus.
@@ -404,6 +529,10 @@ namespace FFVI_ScreenReader.Patches
         {
             try
             {
+                // Only announce in battle — field menu is handled by AbilityMenuPatches
+                if (BattleMenuController_SetCommandSelectTarget_Patch.CurrentActiveCharacter == null)
+                    return;
+
                 if (__instance == null || targetCursor == null)
                 {
                     return;
@@ -477,6 +606,10 @@ namespace FFVI_ScreenReader.Patches
 
                     if (!string.IsNullOrWhiteSpace(description))
                     {
+                        // Strip redundant ability name prefix (game descriptions start with "Name: ...")
+                        if (description.StartsWith(toolName + ":"))
+                            description = description.Substring(toolName.Length + 1).TrimStart();
+
                         announcement += $", {description}";
                     }
                 }
@@ -494,6 +627,128 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in SpecialAbilityContentListController.SetCursor patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for when the slot machine opens and reels start spinning.
+    /// Announces the slot is open and resets the reel counter.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.ReelSpinningInit))]
+    public static class BattleSlotController_ReelSpinningInit_Patch
+    {
+        internal static int reelCount = 0;
+
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                reelCount = 0;
+                string message = T("Slot, stop each reel");
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.ReelSpinningInit patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for each reel stop - announces the symbol that landed.
+    /// Called exactly 3 times (once per reel).
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.SetHitDesignPattern),
+        new Type[] { typeof(SlotDesignPattern) })]
+    public static class BattleSlotController_SetHitDesignPattern_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance, SlotDesignPattern designPattern)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                BattleSlotController_ReelSpinningInit_Patch.reelCount++;
+                int reelNum = BattleSlotController_ReelSpinningInit_Patch.reelCount;
+                string symbolName = GetSlotSymbolName(designPattern);
+                string message = string.Format(T("Reel {0}, {1}"), reelNum, symbolName);
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.SetHitDesignPattern patch: {ex.Message}");
+            }
+        }
+
+        internal static string GetSlotSymbolName(SlotDesignPattern pattern)
+        {
+            switch (pattern)
+            {
+                case SlotDesignPattern.Diamond: return T("Diamond");
+                case SlotDesignPattern.Chocobo: return T("Chocobo");
+                case SlotDesignPattern.BAR: return T("BAR");
+                case SlotDesignPattern.Airship: return T("Airship");
+                case SlotDesignPattern.Bahamut: return T("Bahamut");
+                case SlotDesignPattern.Seven: return T("Seven");
+                default: return T("Unknown");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for when all reels have stopped - announces the resulting ability.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.EndInit))]
+    public static class BattleSlotController_EndInit_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                var first = __instance.firstStopDesign;
+                var second = __instance.secondStopDesign;
+                var third = __instance.thirdStopDesign;
+
+                var provider = ProviderManager.Instance?.SlotInfomationProvider;
+                if (provider == null)
+                {
+                    MelonLogger.Warning("[Battle Slot] SlotInfomationProvider not available");
+                    return;
+                }
+
+                var ability = provider.GetHitAbility(first, second, third);
+                if (ability == null)
+                {
+                    return;
+                }
+
+                string abilityName = ContentUtitlity.GetAbilityName(ability);
+                if (string.IsNullOrWhiteSpace(abilityName))
+                {
+                    return;
+                }
+
+                abilityName = StripIconMarkup(abilityName);
+                string message = string.Format(T("Result: {0}"), abilityName);
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.EndInit patch: {ex.Message}");
             }
         }
     }
