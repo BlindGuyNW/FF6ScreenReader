@@ -6,7 +6,10 @@ using Il2CppLast.Battle;
 using Il2CppLast.UI;
 using Il2CppLast.Data.Master;
 using Il2CppLast.Data.User;
+using Il2CppLast.Defaine;
 using Il2CppLast.Management;
+using Il2CppLast.Systems;
+using Il2CppSerial;
 using Il2CppSerial.FF6.UI.KeyInput;
 using Il2CppSerial.Template.UI.KeyInput;
 using FFVI_ScreenReader.Core;
@@ -624,6 +627,128 @@ namespace FFVI_ScreenReader.Patches
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Error in SpecialAbilityContentListController.SetCursor patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for when the slot machine opens and reels start spinning.
+    /// Announces the slot is open and resets the reel counter.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.ReelSpinningInit))]
+    public static class BattleSlotController_ReelSpinningInit_Patch
+    {
+        internal static int reelCount = 0;
+
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                reelCount = 0;
+                string message = T("Slot, stop each reel");
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.ReelSpinningInit patch: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for each reel stop - announces the symbol that landed.
+    /// Called exactly 3 times (once per reel).
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.SetHitDesignPattern),
+        new Type[] { typeof(SlotDesignPattern) })]
+    public static class BattleSlotController_SetHitDesignPattern_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance, SlotDesignPattern designPattern)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                BattleSlotController_ReelSpinningInit_Patch.reelCount++;
+                int reelNum = BattleSlotController_ReelSpinningInit_Patch.reelCount;
+                string symbolName = GetSlotSymbolName(designPattern);
+                string message = string.Format(T("Reel {0}, {1}"), reelNum, symbolName);
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.SetHitDesignPattern patch: {ex.Message}");
+            }
+        }
+
+        internal static string GetSlotSymbolName(SlotDesignPattern pattern)
+        {
+            switch (pattern)
+            {
+                case SlotDesignPattern.Diamond: return T("Diamond");
+                case SlotDesignPattern.Chocobo: return T("Chocobo");
+                case SlotDesignPattern.BAR: return T("BAR");
+                case SlotDesignPattern.Airship: return T("Airship");
+                case SlotDesignPattern.Bahamut: return T("Bahamut");
+                case SlotDesignPattern.Seven: return T("Seven");
+                default: return T("Unknown");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patch for when all reels have stopped - announces the resulting ability.
+    /// </summary>
+    [HarmonyPatch(typeof(BattleSlotController), nameof(BattleSlotController.EndInit))]
+    public static class BattleSlotController_EndInit_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(BattleSlotController __instance)
+        {
+            try
+            {
+                if (__instance?.view?.gameObject == null || !__instance.view.gameObject.activeInHierarchy)
+                    return;
+
+                var first = __instance.firstStopDesign;
+                var second = __instance.secondStopDesign;
+                var third = __instance.thirdStopDesign;
+
+                var provider = ProviderManager.Instance?.SlotInfomationProvider;
+                if (provider == null)
+                {
+                    MelonLogger.Warning("[Battle Slot] SlotInfomationProvider not available");
+                    return;
+                }
+
+                var ability = provider.GetHitAbility(first, second, third);
+                if (ability == null)
+                {
+                    return;
+                }
+
+                string abilityName = ContentUtitlity.GetAbilityName(ability);
+                if (string.IsNullOrWhiteSpace(abilityName))
+                {
+                    return;
+                }
+
+                abilityName = StripIconMarkup(abilityName);
+                string message = string.Format(T("Result: {0}"), abilityName);
+                MelonLogger.Msg($"[Battle Slot] {message}");
+                FFVI_ScreenReaderMod.SpeakText(message);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"Error in BattleSlotController.EndInit patch: {ex.Message}");
             }
         }
     }
