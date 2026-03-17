@@ -41,6 +41,8 @@ Launch Final Fantasy VI and wait for MelonLoader to build required DLLs. This ma
 
 When exploring the game world, the following hotkeys are available:
 
+**Entity Navigation:**
+
 - **J** or **[**: Cycle to previous entity (NPC, treasure, exit, etc.)
 - **K**: Repeat current entity announcement (without moving selection)
 - **L** or **]**: Cycle to next entity
@@ -51,19 +53,76 @@ When exploring the game world, the following hotkeys are available:
 - **Shift+P** or **Shift+\**: Toggle pathfinding filter (when ON, J/L or [/] only show entities with valid paths)
 - **0** or **Shift+K**: Reset to "All" category (show all entity types)
 - **Ctrl+Arrow Keys**: Teleport one tile in the direction of the arrow relative to the selected entity (Up=North, Down=South, Left=West, Right=East). First select an entity with J/L, then use Ctrl+arrows to teleport in different directions from that entity
-- **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship.
+
+**Waypoint Navigation:**
+
+You can place custom waypoints on any map to mark locations you want to return to.
+
+- **,** (Comma): Cycle to previous waypoint
+- **Shift+,**: Cycle to previous waypoint category
+- **.** (Period): Cycle to next waypoint
+- **Shift+.**: Cycle to next waypoint category
+- **/**: Pathfind to current waypoint
+- **Shift+/**: Add a new waypoint at your current position (opens naming dialog)
+- **Ctrl+/**: Remove current waypoint
+- **Ctrl+Shift+/**: Clear all waypoints for the current map
+- **Ctrl+.**: Rename current waypoint
+
+**Audio Feedback Toggles:**
+
+- **'** (Quote): Toggle footstep sounds
+- **;** (Semicolon): Toggle wall tone sounds
+- **9**: Toggle audio beacons
+
+**Information and Status:**
+
+- **F1**: Announce walk/run movement state
+- **F3**: Announce random encounter state (on/off)
+- **F5**: Cycle enemy HP display mode (Numbers / Percentage / Hidden)
+- **H**: Announce health (HP/MP) for the currently-selected character in battle, or heading on airship
 - **G**: Announce current gil (money)
-- **T**: Announce remaining time on active countdown timers (useful during timed sequences)
-- **Shift+T**: Freeze/resume countdown timers (removes time pressure during timed events for accessibility)
 - **M**: Announce current map name (useful for orientation)
 - **Shift+M**: Toggle map exit filter (when ON, only shows the closest exit for each destination; when OFF, shows all exits)
+- **Ctrl+\\**: Toggle layer transition filter
+- **I**: Announce item description, config tooltip, blitz inputs, or esper details (context-sensitive)
+- **Shift+I**: Announce key help / tooltips for the current screen
+- **T**: Announce remaining time on active countdown timers (useful during timed sequences)
+- **Shift+T**: Freeze/resume countdown timers (removes time pressure during timed events for accessibility)
+
+### Mod Menu (F8)
+
+Press **F8** to open the mod menu, an audio-only settings menu for adjusting the mod's behavior. The mod menu is not available during battle.
+
+- **F8** or **Escape**: Close the mod menu
+- **Up Arrow**: Navigate to previous menu item
+- **Down Arrow**: Navigate to next menu item
+- **Left Arrow**: Decrease value (volume sliders, cycle enum options)
+- **Right Arrow**: Increase value (volume sliders, cycle enum options)
+- **Enter** or **Space**: Toggle or activate the current item
+
+The mod menu contains settings organized into sections:
+
+- **Audio Feedback**: Wall Tones, Wall Bumps, Footsteps, Audio Beacons, and EXP Counter Sound — each with on/off toggle and volume control
+- **Navigation Filters**: Pathfinding Filter, Map Exit Filter, and Layer Transition Filter
+- **Battle Settings**: Enemy HP Display mode (Numbers / Percentage / Hidden)
 
 ### Status Screen Hotkeys
 
 When viewing character status details (from the main menu):
 
-- **J** or **[**: Announce physical stats (Strength, Vigor, Speed, Stamina)
-- **L** or **]**: Announce magical stats (Magic Power, Magic Defense)
+- **Up Arrow**: Navigate to next stat
+- **Down Arrow**: Navigate to previous stat
+- **Shift+Up/Down**: Jump to next/previous stat group
+- **Ctrl+Up/Down**: Jump to top/bottom of stat list
+
+### Bestiary Hotkeys
+
+When viewing bestiary (monster encyclopedia) details:
+
+- **Up Arrow**: Navigate to next stat
+- **Down Arrow**: Navigate to previous stat
+- **Shift+Up/Down**: Jump to next/previous stat group
+- **Ctrl+Up/Down**: Jump to top/bottom of stat list
 
 ### Menu Navigation
 
