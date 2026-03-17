@@ -4,15 +4,16 @@ A screen reader accessibility mod for Final Fantasy VI (Pixel Remaster) that pro
 
 ## What is this?
 
-This is a mod for the Pixel Remaster version of Final Fantasy VI. You can find the game on [Steam](https://store.steampowered.com/app/1173820/FINAL_FANTASY_VI/). Purchase the game and then follow the instructions below to get started. At present a controller is recommended, though the keyboard also works quite well.
+This is a mod for the Pixel Remaster version of Final Fantasy VI. You can find the game on [Steam](https://store.steampowered.com/app/1173820/FINAL_FANTASY_VI/). Purchase the game and then follow the instructions below to get started. A controller is recommended, though the keyboard also works quite well.
 
 ## Features
 
 - **Menu Navigation**: Announces menu items in title screen, config menus, battle commands, item/tool selection, and more
 - **Battle Announcements**: Hear attacks, damage, status effects, experience/gil gains
-- **Field Map Navigation**: Cycle through NPCs, treasure chests, exits with collision-aware pathfinding
-- **Character Status**: Check HP/MP during battles
+- **Field Map Navigation**: Cycle through NPCs, treasure chests, exits with collision-aware pathfinding and customizable waypoints
+- **Character Status**: Check HP/MP during battles and in the field
 - **Hotkeys**: Quick access to entity cycling, pathfinding, and status information
+- **Customization**: Wal tones, wall bumps, or neither, and audio beacons, all toggleable at will
 
 ## Installation
 
@@ -137,14 +138,13 @@ The system works in tandem with the game's built-in menus. When you open menus (
 
 ## Known Issues
 
-- Entity names on the field map are often generic or unclear (working on improvements. If you have access to Japanese translation i'ts a little better.)
-- Some configuration and character customization menus may not be fully accessible yet
+- Some entity names may still be generic or unclear, though the majority have had an AI translation pass 
 - Pathfinding occasionally suggests paths that aren't available due to gameplay restrictions, or says they aren't available when they are.
-- Limited testing beyond the opera minigame.
+- Teleport is very occasionally necessary, though if used recklessly can cause unexpected issues
 
 ## Version
 
-This is an early work-in-progress release. It has rough edges but is playable. The mod has been tested by players through the opera sequence.
+This is a full release. It is possible to beat the game, though certain areas are confusing without a guide and/or teleportation. 
 
 ## Feedback
 
@@ -152,7 +152,8 @@ Please report issues or ask questions on the [GitHub Issues page](https://github
 Join the [Discord Server](https://discord.gg/68MVahtsyn).
 
 ## Credits
-
+- Thanks to Bladestorm360 on Discord for many UI enhancements, and support for the other pixel remasters
+- Thanks to GRad on Discord for a full end to end run-through of the game, and for AI translation help
 - Built with [MelonLoader](https://melonwiki.xyz)
 - Uses [Tolk](https://github.com/dkager/tolk) for screen reader integration
 - Game by Square Enix
