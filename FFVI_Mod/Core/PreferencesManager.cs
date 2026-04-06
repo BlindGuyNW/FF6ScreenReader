@@ -19,6 +19,7 @@ namespace FFVI_ScreenReader.Core
         private static MelonPreferences_Entry<bool> prefWallBumps;
         private static MelonPreferences_Entry<bool> prefFootsteps;
         private static MelonPreferences_Entry<bool> prefAudioBeacons;
+        private static MelonPreferences_Entry<int> prefBeaconDelay;
         private static MelonPreferences_Entry<bool> prefExpCounter;
 
         // Volume preferences (0-100, default 50)
@@ -45,6 +46,7 @@ namespace FFVI_ScreenReader.Core
             prefWallBumps = prefsCategory.CreateEntry<bool>("WallBumps", false, "Wall Bumps", "Play bump sound when walking into walls");
             prefFootsteps = prefsCategory.CreateEntry<bool>("Footsteps", false, "Footsteps", "Play click sound on each tile movement");
             prefAudioBeacons = prefsCategory.CreateEntry<bool>("AudioBeacons", false, "Audio Beacons", "Play periodic pings toward the selected entity");
+            prefBeaconDelay = prefsCategory.CreateEntry<int>("BeaconDelay", 50, "Beacon delay", "How long to wait between audio beacons (0-100, higher values mean greater delay between pings)");
             prefExpCounter = prefsCategory.CreateEntry<bool>("ExpCounter", false, "EXP Counter Sound", "Play rapid beeping while EXP bar animates on battle results");
 
             prefWallBumpVolume = prefsCategory.CreateEntry<int>("WallBumpVolume", 50, "Wall Bump Volume", "Volume for wall bump sounds (0-100)");
@@ -65,6 +67,8 @@ namespace FFVI_ScreenReader.Core
         public static bool WallBumpsDefault => prefWallBumps?.Value ?? false;
         public static bool FootstepsDefault => prefFootsteps?.Value ?? false;
         public static bool AudioBeaconsDefault => prefAudioBeacons?.Value ?? false;
+        public static int BeaconDelay => prefBeaconDelay?.Value ?? 50;
+
         public static bool ExpCounterDefault => prefExpCounter?.Value ?? false;
 
         #endregion
@@ -114,6 +118,14 @@ namespace FFVI_ScreenReader.Core
             if (prefBeaconVolume != null)
             {
                 prefBeaconVolume.Value = Math.Clamp(value, 0, 100);
+                prefsCategory?.SaveToFile(false);
+            }
+        }
+        public static void SetBeaconDelay(int value)
+        {
+            if (prefBeaconDelay != null)
+            {
+                prefBeaconDelay.Value = Math.Clamp(value, 0, 100);
                 prefsCategory?.SaveToFile(false);
             }
         }

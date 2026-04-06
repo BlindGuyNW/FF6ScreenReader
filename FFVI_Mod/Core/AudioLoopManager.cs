@@ -52,7 +52,6 @@ namespace FFVI_ScreenReader.Core
         private const float TILE_SIZE = 16f;
         private const float MAP_EXIT_TOLERANCE = 12.0f;
         private const float WALL_TONE_INTERVAL = 0.1f;
-        private const float BEACON_INTERVAL = 2.0f;
         private const float SCENE_LOAD_SUPPRESSION = 1.0f;
         private const float INITIAL_LOOP_DELAY = 0.3f;
 
@@ -224,7 +223,7 @@ namespace FFVI_ScreenReader.Core
                     yield return null;
                     continue;
                 }
-                nextBeaconTime = Time.time + BEACON_INTERVAL;
+                nextBeaconTime = Time.time + (0.1f + (PreferencesManager.BeaconDelay / 25f));
 
                 if (Time.time < beaconSuppressedUntil)
                     continue;
@@ -252,11 +251,6 @@ namespace FFVI_ScreenReader.Core
                     float pan = Mathf.Clamp(deltaX / 100f, -1f, 1f) * 0.5f + 0.5f;
 
                     bool isSouth = entityPos.y < playerPos.y - 8f;
-
-                    float timeSinceLast = Time.time - lastBeaconPlayedAt;
-                    if (timeSinceLast < BEACON_INTERVAL * 0.8f)
-                        continue;
-
                     SoundPlayer.PlayBeacon(isSouth, pan, volumeScale);
                     lastBeaconPlayedAt = Time.time;
                 }
