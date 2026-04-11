@@ -50,12 +50,12 @@ namespace FFVI_ScreenReader.Core
             public override void Toggle() => toggle();
         }
 
-        private class VolumeItem : MenuItem
+        private class SliderItem : MenuItem
         {
-            private readonly Func<int> getter;
-            private readonly Action<int> setter;
+            protected readonly Func<int> getter;
+            protected readonly Action<int> setter;
 
-            public VolumeItem(string name, Func<int> getter, Action<int> setter)
+            public SliderItem(string name, Func<int> getter, Action<int> setter)
             {
                 nameKey = name;
                 this.getter = getter;
@@ -73,10 +73,27 @@ namespace FFVI_ScreenReader.Core
 
             public override void Toggle()
             {
+                //Only makes sense for volume controls, so leave as no-op.
+                
+            }
+
+        }
+
+        private class VolumeItem: SliderItem
+        {
+
+            public VolumeItem(string name, Func<int> getter, Action<int> setter)
+                : base(name, getter, setter)
+            {
+            }
+
+            public override void Toggle()
+            {
                 // Toggle between 0 and 50 for quick mute/unmute
                 int current = getter();
                 setter(current == 0 ? 50 : 0);
             }
+
         }
 
         private class EnumItem : MenuItem
@@ -183,6 +200,9 @@ namespace FFVI_ScreenReader.Core
                 new ToggleItem("Audio Beacons",
                     () => FFVI_ScreenReaderMod.AudioBeaconsEnabled,
                     () => FFVI_ScreenReaderMod.Instance?.ToggleAudioBeacons()),
+                                new SliderItem("Beacon delay",
+                () => PreferencesManager.BeaconDelay,
+                PreferencesManager.SetBeaconDelay),
                 new VolumeItem("Beacon Volume",
                     () => PreferencesManager.BeaconVolume,
                     PreferencesManager.SetBeaconVolume),
